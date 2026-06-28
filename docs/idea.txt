@@ -1,0 +1,20 @@
+
+https://chatgpt.com/share/6a3eac43-8a28-83ea-abc0-ddfed6b7948b
+
+-Guest phones
+-Master phone
+-Organizer
+-Server
+
+Create a Video Party
+-Organizer uses VPapp to Create a Video Party. No login needed.
+  -VP creation generates 2 tokens: TK1 identifies party instance, TK2m identifies organizer
+  -Organzer is authenticated by these two TK1+TK2m 
+-Organizer using VPapp generate an invitation unique token for each guest TK1+TK2n
+-Organizer using SMS sends invitations to the Guests phones. Invitations include the invitation token.
+-Guest uses VPapp to subscribe to the VP instance using the invitation token.
+-Guest uses YouTube to share a video through VPapp. 
+	-VPapp sends videoID+TK1+TK2n to server
+	-Server routes the call to Master phone
+	-Master adds the videoID to the playing list
+
