@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="VideoParty.Api/VideoParty.Api.csproj" />
+  <Project Path="VideoParty.DataAccess/VideoParty.DataAccess.csproj" Id="6cd42b81-a3c4-43c4-b872-92f2497ecb38" />
+  <Project Path="VideoParty.Model/VideoParty.Model.csproj" Id="515ad73f-17cb-4df6-a254-60181297778e" />
 </Solution>
