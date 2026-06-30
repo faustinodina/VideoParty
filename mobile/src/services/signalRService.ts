@@ -4,12 +4,23 @@ import {
   LogLevel,
 } from "@microsoft/signalr";
 
+import { HUB_URL } from "@/constants/config";
+
+// Mirrors the GuestRegistered payload broadcast by the API (VPController.RegisterGuest).
+export interface PartyGuest {
+  partyGuestId: string;
+  partyId: string;
+  guestName: string;
+}
+
 class SignalRService {
   private connection: HubConnection | null = null;
+  // Remembered so we can re-join the party group after an automatic reconnect.
+  private currentPartyId: string | null = null;
 
   async connect() {
     this.connection = new HubConnectionBuilder()
-      .withUrl("https://your-api.com/hubs/videoParty", {
+      .withUrl(HUB_URL, {
         accessTokenFactory: () => "your-jwt-token",
       })
       .withAutomaticReconnect()
@@ -20,8 +31,11 @@ class SignalRService {
       console.log("SignalR reconnecting", error);
     });
 
-    this.connection.onreconnected((connectionId) => {
+    this.connection.onreconnected(async (connectionId) => {
       console.log("SignalR connected again", connectionId);
+      // Group membership is tied to the connection id, which changes on
+      // reconnect, so re-join the party group to keep receiving its events.
+      await this.rejoinCurrentParty();
     });
 
     this.connection.onclose((error) => {
@@ -31,6 +45,25 @@ class SignalRService {
     await this.connection.start();
 
     console.log("SignalR connected");
+
+    // Flush a party join requested before the connection finished starting.
+    await this.rejoinCurrentParty();
+  }
+
+  // Join a party group so this client receives that party's events
+  // (e.g. GuestRegistered). Safe to call before/after connecting.
+  async joinParty(partyId: string) {
+    this.currentPartyId = partyId;
+
+    if (this.connection?.state === "Connected") {
+      await this.connection.invoke("JoinParty", partyId);
+    }
+  }
+
+  private async rejoinCurrentParty() {
+    if (this.currentPartyId && this.connection?.state === "Connected") {
+      await this.connection.invoke("JoinParty", this.currentPartyId);
+    }
   }
 
   async send(method: string, ...args: any[]) {
@@ -43,10 +76,22 @@ class SignalRService {
     this.connection?.on(event, callback);
   }
 
+  off(event: string, callback: (...args: any[]) => void) {
+    this.connection?.off(event, callback);
+  }
+
+  // Strongly-typed convenience subscription for the GuestRegistered event.
+  // Returns an unsubscribe function for cleanup.
+  onGuestRegistered(callback: (guest: PartyGuest) => void) {
+    this.connection?.on("GuestRegistered", callback);
+    return () => this.connection?.off("GuestRegistered", callback);
+  }
+
   async disconnect() {
     await this.connection?.stop();
 
     this.connection = null;
+    this.currentPartyId = null;
   }
 }
 
