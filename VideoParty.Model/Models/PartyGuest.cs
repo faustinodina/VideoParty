@@ -1,10 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text;
 
 namespace VideoParty.Model.Models
 {
   public class PartyGuest
   {
+    [Key]
+    public required Guid PartyGuestId { get; set; }
+
+    public required Guid PartyId { get; set; }
+
+    public Party Party { get; set; } = null!;
+
+    public required string GuestName { get; set; }
   }
 }
