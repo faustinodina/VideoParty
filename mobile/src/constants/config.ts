@@ -12,6 +12,6 @@
  * your machine's LAN IP, not localhost.
  */
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5070';
+  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5071";
 
-export const HUB_URL = `${API_BASE_URL.replace(/\/$/, '')}/hubs/user`;
+export const HUB_URL = `${API_BASE_URL.replace(/\/$/, "")}/hubs/user`;
