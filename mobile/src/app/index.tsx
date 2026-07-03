@@ -1,5 +1,4 @@
 import * as Device from "expo-device";
-import { useState } from "react";
 import { Platform, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -9,8 +8,8 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { WebBadge } from "@/components/web-badge";
 import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
-import { createParty, Party } from "@/services/partyApi";
-import signalR from "@/services/signalRService";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { createParty } from "@/store/partySlice";
 
 function getDevMenuHint() {
   if (Platform.OS === "web") {
@@ -32,24 +31,13 @@ function getDevMenuHint() {
 }
 
 export default function HomeScreen() {
-  const [creating, setCreating] = useState(false);
-  const [party, setParty] = useState<Party | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { party, creating, createError } = useAppSelector(
+    (state) => state.party
+  );
 
-  const handleCreateParty = async () => {
-    setCreating(true);
-    setError(null);
-    try {
-      const created = await createParty("My Party");
-      setParty(created);
-      // Join the party's SignalR group so this client receives its events
-      // (e.g. GuestRegistered). Remembered by the service across reconnects.
-      await signalR.joinParty(created.partyId);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setCreating(false);
-    }
+  const handleCreateParty = () => {
+    dispatch(createParty("My Party"));
   };
 
   return (
@@ -77,9 +65,9 @@ export default function HomeScreen() {
               Party created: <ThemedText type="code">{party.partyId}</ThemedText>
             </ThemedText>
           )}
-          {error && (
+          {createError && (
             <ThemedText type="small" style={styles.errorText}>
-              {error}
+              {createError}
             </ThemedText>
           )}
         </ThemedView>

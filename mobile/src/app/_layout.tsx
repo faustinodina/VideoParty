@@ -1,10 +1,13 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
+import { useEffect } from "react";
 import { useColorScheme } from "react-native";
+import { Provider } from "react-redux";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
 import signalR from "@/services/signalRService";
-import { useEffect } from "react";
+import { store } from "@/store";
+import { guestRegistered } from "@/store/partySlice";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -14,17 +17,25 @@ export default function TabLayout() {
       console.log("Playing video:", videoId);
     });
 
+    // Bridge SignalR events into the store so any screen can select them.
+    const unsubscribe = signalR.onGuestRegistered((guest) => {
+      store.dispatch(guestRegistered(guest));
+    });
+
     signalR.connect();
 
     return () => {
+      unsubscribe();
       signalR.disconnect();
     };
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <Provider store={store}>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <AnimatedSplashOverlay />
+        <AppTabs />
+      </ThemeProvider>
+    </Provider>
   );
 }

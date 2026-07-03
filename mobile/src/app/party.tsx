@@ -5,18 +5,22 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { usePartyGuests } from '@/hooks/usePartyGuests';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { joinParty } from '@/store/partySlice';
 
 export default function PartyScreen() {
   const theme = useTheme();
+  const dispatch = useAppDispatch();
   const [partyIdInput, setPartyIdInput] = useState('');
-  const [joinedPartyId, setJoinedPartyId] = useState<string | null>(null);
 
-  const guests = usePartyGuests(joinedPartyId);
+  const joinedPartyId = useAppSelector((state) => state.party.joinedPartyId);
+  const guests = useAppSelector((state) => state.party.guests);
 
   const join = () => {
     const trimmed = partyIdInput.trim();
-    setJoinedPartyId(trimmed.length > 0 ? trimmed : null);
+    if (trimmed.length > 0) {
+      dispatch(joinParty(trimmed));
+    }
   };
 
   return (

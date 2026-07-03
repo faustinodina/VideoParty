@@ -17,6 +17,9 @@ class SignalRService {
   private connection: HubConnection | null = null;
   // Remembered so we can re-join the party group after an automatic reconnect.
   private currentPartyId: string | null = null;
+  // Handlers registered before connect(): the HubConnection doesn't exist
+  // yet at that point, so they are queued here and applied in connect().
+  private handlers: Array<[string, (...args: any[]) => void]> = [];
 
   async connect() {
     console.log("SignalR connecting to", HUB_URL);
@@ -28,6 +31,10 @@ class SignalRService {
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Information)
       .build();
+
+    for (const [event, callback] of this.handlers) {
+      this.connection.on(event, callback);
+    }
 
     this.connection.onreconnecting((error) => {
       console.log("SignalR reconnecting", error);
@@ -75,18 +82,22 @@ class SignalRService {
   }
 
   on(event: string, callback: (...args: any[]) => void) {
+    this.handlers.push([event, callback]);
     this.connection?.on(event, callback);
   }
 
   off(event: string, callback: (...args: any[]) => void) {
+    this.handlers = this.handlers.filter(
+      ([e, cb]) => e !== event || cb !== callback
+    );
     this.connection?.off(event, callback);
   }
 
   // Strongly-typed convenience subscription for the GuestRegistered event.
   // Returns an unsubscribe function for cleanup.
   onGuestRegistered(callback: (guest: PartyGuest) => void) {
-    this.connection?.on("GuestRegistered", callback);
-    return () => this.connection?.off("GuestRegistered", callback);
+    this.on("GuestRegistered", callback);
+    return () => this.off("GuestRegistered", callback);
   }
 
   async disconnect() {
