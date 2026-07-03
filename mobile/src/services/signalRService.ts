@@ -19,6 +19,8 @@ class SignalRService {
   private currentPartyId: string | null = null;
 
   async connect() {
+    console.log("SignalR connecting to", HUB_URL);
+
     this.connection = new HubConnectionBuilder()
       .withUrl(HUB_URL, {
         accessTokenFactory: () => "your-jwt-token",
