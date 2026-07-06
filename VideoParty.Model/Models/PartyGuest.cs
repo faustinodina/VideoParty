@@ -6,7 +6,7 @@ using System.Text;
 
 namespace VideoParty.Model.Models
 {
-  public class PartyGuest
+  public class PartyGuest : ITimestamped
   {
     [Key]
     public required Guid PartyGuestId { get; set; }
@@ -19,5 +19,9 @@ namespace VideoParty.Model.Models
     public required Guid UserId { get; set; }
 
     public required string GuestName { get; set; }
+
+    // Set by ApplicationDbContext on save; not `required` on purpose.
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
   }
 }

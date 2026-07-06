@@ -5,6 +5,9 @@ export interface Party {
   partyId: string;
   name: string;
   organizerUserId: string;
+  /** ISO 8601 UTC, stamped by the API. */
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Mirrors PartySummary returned by GET /VP/users/{userId}/parties.
@@ -22,6 +25,9 @@ export interface RegisteredGuest {
   partyId: string;
   userId: string;
   guestName: string;
+  /** ISO 8601 UTC, stamped by the API. */
+  createdAt: string;
+  updatedAt: string;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
