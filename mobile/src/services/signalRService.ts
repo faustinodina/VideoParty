@@ -13,7 +13,7 @@ class SignalRService {
   private currentPartyId: string | null = null;
   // Handlers registered before connect(): the HubConnection doesn't exist
   // yet at that point, so they are queued here and applied in connect().
-  private handlers: Array<[string, (...args: any[]) => void]> = [];
+  private handlers: [string, (...args: any[]) => void][] = [];
 
   async connect() {
     console.log("SignalR connecting to", HUB_URL);
