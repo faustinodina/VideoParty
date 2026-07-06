@@ -3,17 +3,18 @@ import * as Device from "expo-device";
 
 import {
   createParty as createPartyApi,
-  getGuests,
+  getMembers,
   getUserParties,
+  PartyMember,
   PartySummary,
-  registerGuest,
+  registerMember,
 } from "@/services/partyApi";
-import signalR, { PartyGuest } from "@/services/signalRService";
+import signalR from "@/services/signalRService";
 import { getUserId } from "@/services/userIdentity";
 import type { RootState } from "@/store";
 
 interface PartyState {
-  /** Parties where this device's user is organizer or guest. */
+  /** Parties where this device's user is organizer or member. */
   parties: PartySummary[];
   loadingParties: boolean;
   partiesError: string | null;
@@ -23,8 +24,8 @@ interface PartyState {
   joinError: string | null;
   /** Party currently open on the Party tab (its SignalR group is joined). */
   activePartyId: string | null;
-  /** Guests received for the active party during this session. */
-  guests: PartyGuest[];
+  /** Members of the active party (fetched snapshot + live joins). */
+  members: PartyMember[];
 }
 
 const initialState: PartyState = {
@@ -36,39 +37,52 @@ const initialState: PartyState = {
   joining: false,
   joinError: null,
   activePartyId: null,
-  guests: [],
+  members: [],
 };
+
+// The only display name available until user profiles exist.
+function deviceDisplayName() {
+  return Device.deviceName ?? "Guest";
+}
 
 export const fetchParties = createAsyncThunk("party/fetchAll", async () => {
   const userId = await getUserId();
   return getUserParties(userId);
 });
 
-// Creates the party on the API, then joins its SignalR group so this client
-// receives the party's events (e.g. GuestRegistered).
+// Creates the party on the API (which registers the organizer as its first
+// member), then joins its SignalR group so this client receives the party's
+// events (e.g. MemberJoined).
 export const createParty = createAsyncThunk(
   "party/create",
-  async (name: string): Promise<PartySummary> => {
+  async (name: string) => {
     const userId = await getUserId();
-    const party = await createPartyApi(name, userId);
+    const party = await createPartyApi(name, userId, deviceDisplayName());
     await signalR.joinParty(party.partyId);
-    return { partyId: party.partyId, name: party.name, role: "organizer" };
+    const members = await getMembers(party.partyId);
+    const summary: PartySummary = {
+      partyId: party.partyId,
+      name: party.name,
+      role: "organizer",
+      createdAt: party.createdAt,
+      organizerUserId: party.organizerUserId,
+    };
+    return { summary, members };
   }
 );
 
-// Registers this user as a guest of an existing party (so it shows up in the
-// party list from now on), then joins its SignalR group.
+// Registers this user as a member of an existing party (so it shows up in
+// the party list from now on), then joins its SignalR group.
 export const joinParty = createAsyncThunk(
   "party/join",
   async (partyId: string, { dispatch }) => {
     const userId = await getUserId();
-    const guestName = Device.deviceName ?? "Guest";
-    const guest = await registerGuest(partyId, guestName, userId);
-    await signalR.joinParty(guest.partyId);
+    const member = await registerMember(partyId, deviceDisplayName(), userId);
+    await signalR.joinParty(member.partyId);
     // The register response has no party name; refresh the list to get it.
     await dispatch(fetchParties());
-    const guests = await getGuests(guest.partyId);
-    return { partyId: guest.partyId, guests };
+    const members = await getMembers(member.partyId);
+    return { partyId: member.partyId, members };
   }
 );
 
@@ -77,8 +91,8 @@ export const openParty = createAsyncThunk(
   "party/open",
   async (partyId: string) => {
     await signalR.joinParty(partyId);
-    const guests = await getGuests(partyId);
-    return { partyId, guests };
+    const members = await getMembers(partyId);
+    return { partyId, members };
   }
 );
 
@@ -87,19 +101,19 @@ const partySlice = createSlice({
   initialState,
   reducers: {
     // Dispatched from the app-level SignalR subscription (see _layout).
-    guestRegistered(state, action: PayloadAction<PartyGuest>) {
+    memberJoined(state, action: PayloadAction<PartyMember>) {
       // Guids from the API are lowercase; a hand-typed party id may not be.
-      // Skip guests already known from the fetched snapshot: a registration
-      // can arrive over SignalR right after it was included in getGuests.
+      // Skip members already known from the fetched snapshot: a join can
+      // arrive over SignalR right after it was included in getMembers.
       if (
         state.activePartyId &&
         action.payload.partyId.toLowerCase() ===
           state.activePartyId.toLowerCase() &&
-        !state.guests.some(
-          (g) => g.partyGuestId === action.payload.partyGuestId
+        !state.members.some(
+          (m) => m.partyMemberId === action.payload.partyMemberId
         )
       ) {
-        state.guests.push(action.payload);
+        state.members.push(action.payload);
       }
     },
   },
@@ -123,9 +137,9 @@ const partySlice = createSlice({
       })
       .addCase(createParty.fulfilled, (state, action) => {
         state.creating = false;
-        state.parties.unshift(action.payload);
-        state.activePartyId = action.payload.partyId;
-        state.guests = [];
+        state.parties.unshift(action.payload.summary);
+        state.activePartyId = action.payload.summary.partyId;
+        state.members = action.payload.members;
       })
       .addCase(createParty.rejected, (state, action) => {
         state.creating = false;
@@ -138,16 +152,16 @@ const partySlice = createSlice({
       .addCase(joinParty.fulfilled, (state, action) => {
         state.joining = false;
         state.activePartyId = action.payload.partyId;
-        state.guests = action.payload.guests;
+        state.members = action.payload.members;
       })
       .addCase(joinParty.rejected, (state, action) => {
         state.joining = false;
         state.joinError = action.error.message ?? "Something went wrong";
       })
       .addCase(openParty.fulfilled, (state, action) => {
-        // Always replace: re-opening the same party refreshes its guests.
+        // Always replace: re-opening the same party refreshes its members.
         state.activePartyId = action.payload.partyId;
-        state.guests = action.payload.guests;
+        state.members = action.payload.members;
       });
   },
 });
@@ -156,5 +170,5 @@ export const selectActiveParty = (state: RootState) =>
   state.party.parties.find((p) => p.partyId === state.party.activePartyId) ??
   null;
 
-export const { guestRegistered } = partySlice.actions;
+export const { memberJoined } = partySlice.actions;
 export default partySlice.reducer;

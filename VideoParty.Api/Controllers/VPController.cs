@@ -32,34 +32,7 @@ namespace VideoParty.Api.Controllers
       return party;
     }
 
-    [HttpGet("parties/{partyId:guid}/guests")]
-    public async Task<ActionResult<IEnumerable<PartyGuest>>> GetGuests(Guid partyId)
-    {
-      var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
-      if (!partyExists)
-      {
-        return NotFound($"Party '{partyId}' was not found.");
-      }
-
-      return await _db.PartyGuests
-          .Where(g => g.PartyId == partyId)
-          .ToListAsync();
-    }
-
-    [HttpGet("parties/{partyId:guid}/guests/{id:guid}", Name = nameof(GetGuest))]
-    public async Task<ActionResult<PartyGuest>> GetGuest(Guid partyId, Guid id)
-    {
-      var guest = await _db.PartyGuests
-          .FirstOrDefaultAsync(g => g.PartyId == partyId && g.PartyGuestId == id);
-      if (guest is null)
-      {
-        return NotFound($"Guest '{id}' was not found in party '{partyId}'.");
-      }
-
-      return guest;
-    }
-
-    // All parties where the user is the organizer or a registered guest.
+    // All parties where the user is the organizer or a member, newest first.
     [HttpGet("users/{userId:guid}/parties")]
     public async Task<ActionResult<IEnumerable<PartySummary>>> GetUserParties(Guid userId)
     {
@@ -67,15 +40,48 @@ namespace VideoParty.Api.Controllers
       // projections to the PartySummary record.
       var organized = await _db.Parties
           .Where(p => p.OrganizerUserId == userId)
-          .Select(p => new PartySummary(p.PartyId, p.Name, PartyRole.Organizer))
+          .Select(p => new PartySummary(
+              p.PartyId, p.Name, PartyRole.Organizer, p.CreatedAt, p.OrganizerUserId))
           .ToListAsync();
 
-      var joined = await _db.PartyGuests
-          .Where(g => g.UserId == userId && g.Party.OrganizerUserId != userId)
-          .Select(g => new PartySummary(g.PartyId, g.Party.Name, PartyRole.Guest))
+      // Organized parties are excluded: the organizer also has a member row,
+      // which would otherwise duplicate the party in the list.
+      var joined = await _db.PartyMembers
+          .Where(m => m.UserId == userId && m.Party.OrganizerUserId != userId)
+          .Select(m => new PartySummary(
+              m.PartyId, m.Party.Name, PartyRole.Guest, m.Party.CreatedAt, m.Party.OrganizerUserId))
           .ToListAsync();
 
-      return organized.Concat(joined).ToList();
+      return organized.Concat(joined)
+          .OrderByDescending(p => p.CreatedAt)
+          .ToList();
+    }
+
+    [HttpGet("parties/{partyId:guid}/members")]
+    public async Task<ActionResult<IEnumerable<PartyMember>>> GetMembers(Guid partyId)
+    {
+      var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
+      if (!partyExists)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      return await _db.PartyMembers
+          .Where(m => m.PartyId == partyId)
+          .ToListAsync();
+    }
+
+    [HttpGet("parties/{partyId:guid}/members/{id:guid}", Name = nameof(GetMember))]
+    public async Task<ActionResult<PartyMember>> GetMember(Guid partyId, Guid id)
+    {
+      var member = await _db.PartyMembers
+          .FirstOrDefaultAsync(m => m.PartyId == partyId && m.PartyMemberId == id);
+      if (member is null)
+      {
+        return NotFound($"Member '{id}' was not found in party '{partyId}'.");
+      }
+
+      return member;
     }
 
     [HttpPost("parties")]
@@ -88,14 +94,27 @@ namespace VideoParty.Api.Controllers
         OrganizerUserId = request.OrganizerUserId
       };
 
+      // The organizer is a participant of their own party; registering them
+      // here keeps the members list the single source of truth (and is the
+      // only place their display name is captured). Same SaveChanges so the
+      // party is never persisted without its organizer.
+      var organizerMember = new PartyMember
+      {
+        PartyMemberId = Guid.NewGuid(),
+        PartyId = party.PartyId,
+        UserId = request.OrganizerUserId,
+        DisplayName = request.OrganizerName
+      };
+
       _db.Parties.Add(party);
+      _db.PartyMembers.Add(organizerMember);
       await _db.SaveChangesAsync();
 
       return CreatedAtAction(nameof(GetParty), new { id = party.PartyId }, party);
     }
 
-    [HttpPost("parties/{partyId:guid}/guests")]
-    public async Task<ActionResult<PartyGuest>> RegisterGuest(Guid partyId, RegisterGuestRequest request)
+    [HttpPost("parties/{partyId:guid}/members")]
+    public async Task<ActionResult<PartyMember>> RegisterMember(Guid partyId, RegisterMemberRequest request)
     {
       var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
       if (!partyExists)
@@ -103,40 +122,43 @@ namespace VideoParty.Api.Controllers
         return NotFound($"Party '{partyId}' was not found.");
       }
 
-      // Joining twice from the same device is a no-op: return the existing guest.
-      var existing = await _db.PartyGuests
-          .FirstOrDefaultAsync(g => g.PartyId == partyId && g.UserId == request.UserId);
+      // Joining twice from the same device is a no-op: return the existing member.
+      var existing = await _db.PartyMembers
+          .FirstOrDefaultAsync(m => m.PartyId == partyId && m.UserId == request.UserId);
       if (existing is not null)
       {
         return existing;
       }
 
-      var guest = new PartyGuest
+      var member = new PartyMember
       {
-        PartyGuestId = Guid.NewGuid(),
+        PartyMemberId = Guid.NewGuid(),
         PartyId = partyId,
         UserId = request.UserId,
-        GuestName = request.GuestName
+        DisplayName = request.DisplayName
       };
 
-      _db.PartyGuests.Add(guest);
+      _db.PartyMembers.Add(member);
       await _db.SaveChangesAsync();
 
-      await _hub.Clients.Group(partyId.ToString()).SendAsync("GuestRegistered", new
+      // Same shape as GetMembers items so clients can mix fetched and live data.
+      await _hub.Clients.Group(partyId.ToString()).SendAsync("MemberJoined", new
       {
-        guest.PartyGuestId,
-        guest.PartyId,
-        guest.UserId,
-        guest.GuestName
+        member.PartyMemberId,
+        member.PartyId,
+        member.UserId,
+        member.DisplayName,
+        member.CreatedAt,
+        member.UpdatedAt
       });
 
-      return CreatedAtAction(nameof(GetGuest), new { partyId = partyId, id = guest.PartyGuestId }, guest);
+      return CreatedAtAction(nameof(GetMember), new { partyId = partyId, id = member.PartyMemberId }, member);
     }
   }
 
-  public record CreatePartyRequest(string Name, Guid OrganizerUserId);
+  public record CreatePartyRequest(string Name, Guid OrganizerUserId, string OrganizerName);
 
-  public record RegisterGuestRequest(string GuestName, Guid UserId);
+  public record RegisterMemberRequest(string DisplayName, Guid UserId);
 
   public enum PartyRole
   {
@@ -144,5 +166,6 @@ namespace VideoParty.Api.Controllers
     Guest
   }
 
-  public record PartySummary(Guid PartyId, string Name, PartyRole Role);
+  public record PartySummary(
+      Guid PartyId, string Name, PartyRole Role, DateTime CreatedAt, Guid OrganizerUserId);
 }

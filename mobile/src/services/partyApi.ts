@@ -17,14 +17,18 @@ export interface PartySummary {
   partyId: string;
   name: string;
   role: PartyRole;
+  /** ISO 8601 UTC creation time of the party; the API sorts by it, newest first. */
+  createdAt: string;
+  organizerUserId: string;
 }
 
-// Mirrors the PartyGuest entity returned by RegisterGuest.
-export interface RegisteredGuest {
-  partyGuestId: string;
+// Mirrors the PartyMember entity; also the MemberJoined SignalR payload,
+// which the API broadcasts with the same shape.
+export interface PartyMember {
+  partyMemberId: string;
   partyId: string;
   userId: string;
-  guestName: string;
+  displayName: string;
   /** ISO 8601 UTC, stamped by the API. */
   createdAt: string;
   updatedAt: string;
@@ -49,17 +53,21 @@ function post<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
-export function createParty(name: string, organizerUserId: string): Promise<Party> {
-  return post<Party>("/VP/parties", { name, organizerUserId });
+export function createParty(
+  name: string,
+  organizerUserId: string,
+  organizerName: string
+): Promise<Party> {
+  return post<Party>("/VP/parties", { name, organizerUserId, organizerName });
 }
 
-export function registerGuest(
+export function registerMember(
   partyId: string,
-  guestName: string,
+  displayName: string,
   userId: string
-): Promise<RegisteredGuest> {
-  return post<RegisteredGuest>(`/VP/parties/${partyId}/guests`, {
-    guestName,
+): Promise<PartyMember> {
+  return post<PartyMember>(`/VP/parties/${partyId}/members`, {
+    displayName,
     userId,
   });
 }
@@ -68,6 +76,6 @@ export function getUserParties(userId: string): Promise<PartySummary[]> {
   return request<PartySummary[]>(`/VP/users/${userId}/parties`);
 }
 
-export function getGuests(partyId: string): Promise<RegisteredGuest[]> {
-  return request<RegisteredGuest[]>(`/VP/parties/${partyId}/guests`);
+export function getMembers(partyId: string): Promise<PartyMember[]> {
+  return request<PartyMember[]>(`/VP/parties/${partyId}/members`);
 }

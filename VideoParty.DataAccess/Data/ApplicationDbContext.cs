@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -16,7 +17,30 @@ namespace VideoParty.DataAccess.Data
     }
 
     public DbSet<Party> Parties { get; set; }
-    public DbSet<PartyGuest> PartyGuests { get; set; }
+    public DbSet<PartyMember> PartyMembers { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+      base.OnModelCreating(modelBuilder);
+
+      // SQLite stores DateTime as TEXT with no kind, so values read back are
+      // Kind=Unspecified and would serialize without the Z suffix. All stored
+      // timestamps are UTC by convention; mark them as such when reading.
+      var utcConverter = new ValueConverter<DateTime, DateTime>(
+          v => v,
+          v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+      foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+      {
+        foreach (var property in entityType.GetProperties())
+        {
+          if (property.ClrType == typeof(DateTime))
+          {
+            property.SetValueConverter(utcConverter);
+          }
+        }
+      }
+    }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

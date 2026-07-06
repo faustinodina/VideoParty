@@ -7,7 +7,7 @@ import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
 import signalR from "@/services/signalRService";
 import { store } from "@/store";
-import { guestRegistered } from "@/store/partySlice";
+import { memberJoined } from "@/store/partySlice";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -18,8 +18,8 @@ export default function TabLayout() {
     });
 
     // Bridge SignalR events into the store so any screen can select them.
-    const unsubscribe = signalR.onGuestRegistered((guest) => {
-      store.dispatch(guestRegistered(guest));
+    const unsubscribe = signalR.onMemberJoined((member) => {
+      store.dispatch(memberJoined(member));
     });
 
     signalR.connect();

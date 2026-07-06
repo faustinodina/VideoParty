@@ -11,7 +11,7 @@ export default function PartyScreen() {
   const theme = useTheme();
 
   const activeParty = useAppSelector(selectActiveParty);
-  const guests = useAppSelector((state) => state.party.guests);
+  const members = useAppSelector((state) => state.party.members);
 
   if (!activeParty) {
     return (
@@ -28,8 +28,8 @@ export default function PartyScreen() {
       style={[styles.list, { backgroundColor: theme.background }]}
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
-      data={guests}
-      keyExtractor={(item) => item.partyGuestId}
+      data={members}
+      keyExtractor={(item) => item.partyMemberId}
       ListHeaderComponent={
         <ThemedView style={styles.header}>
           <ThemedText type="title">{activeParty.name}</ThemedText>
@@ -42,17 +42,26 @@ export default function PartyScreen() {
               {activeParty.partyId}
             </ThemedText>
           </ThemedView>
-          <ThemedText type="subtitle">Party guests</ThemedText>
+          <ThemedText type="subtitle">Members</ThemedText>
         </ThemedView>
       }
       renderItem={({ item }) => (
-        <ThemedView type="backgroundElement" style={styles.guestRow}>
-          <ThemedText selectable>{item.guestName}</ThemedText>
+        <ThemedView type="backgroundElement" style={styles.memberRow}>
+          <ThemedText selectable style={styles.memberName}>
+            {item.displayName}
+          </ThemedText>
+          {item.userId === activeParty.organizerUserId && (
+            <ThemedView type="backgroundSelected" style={styles.organizerBadge}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Organizer
+              </ThemedText>
+            </ThemedView>
+          )}
         </ThemedView>
       )}
       ListEmptyComponent={
         <ThemedText themeColor="textSecondary" style={styles.empty}>
-          No guests yet. New registrations will appear here in real time.
+          No members yet. New joins will appear here in real time.
         </ThemedText>
       }
     />
@@ -87,11 +96,22 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     alignSelf: 'flex-start',
   },
-  guestRow: {
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     borderRadius: Spacing.two,
     borderCurve: 'continuous',
+  },
+  memberName: {
+    flex: 1,
+  },
+  organizerBadge: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+    borderRadius: Spacing.two,
   },
   empty: {
     textAlign: 'center',

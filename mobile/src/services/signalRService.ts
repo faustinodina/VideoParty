@@ -5,14 +5,7 @@ import {
 } from "@microsoft/signalr";
 
 import { HUB_URL } from "@/constants/config";
-
-// Mirrors the GuestRegistered payload broadcast by the API (VPController.RegisterGuest).
-export interface PartyGuest {
-  partyGuestId: string;
-  partyId: string;
-  userId: string;
-  guestName: string;
-}
+import type { PartyMember } from "@/services/partyApi";
 
 class SignalRService {
   private connection: HubConnection | null = null;
@@ -61,7 +54,7 @@ class SignalRService {
   }
 
   // Join a party group so this client receives that party's events
-  // (e.g. GuestRegistered). Safe to call before/after connecting.
+  // (e.g. MemberJoined). Safe to call before/after connecting.
   async joinParty(partyId: string) {
     this.currentPartyId = partyId;
 
@@ -94,11 +87,12 @@ class SignalRService {
     this.connection?.off(event, callback);
   }
 
-  // Strongly-typed convenience subscription for the GuestRegistered event.
+  // Strongly-typed convenience subscription for the MemberJoined event,
+  // broadcast by the API with the same shape as the PartyMember entity.
   // Returns an unsubscribe function for cleanup.
-  onGuestRegistered(callback: (guest: PartyGuest) => void) {
-    this.on("GuestRegistered", callback);
-    return () => this.off("GuestRegistered", callback);
+  onMemberJoined(callback: (member: PartyMember) => void) {
+    this.on("MemberJoined", callback);
+    return () => this.off("MemberJoined", callback);
   }
 
   async disconnect() {
