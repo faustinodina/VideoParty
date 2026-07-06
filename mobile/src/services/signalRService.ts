@@ -10,6 +10,7 @@ import { HUB_URL } from "@/constants/config";
 export interface PartyGuest {
   partyGuestId: string;
   partyId: string;
+  userId: string;
   guestName: string;
 }
 

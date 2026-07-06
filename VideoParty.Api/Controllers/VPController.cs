@@ -32,6 +32,20 @@ namespace VideoParty.Api.Controllers
       return party;
     }
 
+    [HttpGet("parties/{partyId:guid}/guests")]
+    public async Task<ActionResult<IEnumerable<PartyGuest>>> GetGuests(Guid partyId)
+    {
+      var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
+      if (!partyExists)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      return await _db.PartyGuests
+          .Where(g => g.PartyId == partyId)
+          .ToListAsync();
+    }
+
     [HttpGet("parties/{partyId:guid}/guests/{id:guid}", Name = nameof(GetGuest))]
     public async Task<ActionResult<PartyGuest>> GetGuest(Guid partyId, Guid id)
     {
@@ -45,13 +59,33 @@ namespace VideoParty.Api.Controllers
       return guest;
     }
 
+    // All parties where the user is the organizer or a registered guest.
+    [HttpGet("users/{userId:guid}/parties")]
+    public async Task<ActionResult<IEnumerable<PartySummary>>> GetUserParties(Guid userId)
+    {
+      // Two queries combined in memory: EF cannot translate Concat over
+      // projections to the PartySummary record.
+      var organized = await _db.Parties
+          .Where(p => p.OrganizerUserId == userId)
+          .Select(p => new PartySummary(p.PartyId, p.Name, PartyRole.Organizer))
+          .ToListAsync();
+
+      var joined = await _db.PartyGuests
+          .Where(g => g.UserId == userId && g.Party.OrganizerUserId != userId)
+          .Select(g => new PartySummary(g.PartyId, g.Party.Name, PartyRole.Guest))
+          .ToListAsync();
+
+      return organized.Concat(joined).ToList();
+    }
+
     [HttpPost("parties")]
     public async Task<ActionResult<Party>> CreateParty(CreatePartyRequest request)
     {
       var party = new Party
       {
         PartyId = Guid.NewGuid(),
-        Name = request.Name
+        Name = request.Name,
+        OrganizerUserId = request.OrganizerUserId
       };
 
       _db.Parties.Add(party);
@@ -69,10 +103,19 @@ namespace VideoParty.Api.Controllers
         return NotFound($"Party '{partyId}' was not found.");
       }
 
+      // Joining twice from the same device is a no-op: return the existing guest.
+      var existing = await _db.PartyGuests
+          .FirstOrDefaultAsync(g => g.PartyId == partyId && g.UserId == request.UserId);
+      if (existing is not null)
+      {
+        return existing;
+      }
+
       var guest = new PartyGuest
       {
         PartyGuestId = Guid.NewGuid(),
         PartyId = partyId,
+        UserId = request.UserId,
         GuestName = request.GuestName
       };
 
@@ -83,6 +126,7 @@ namespace VideoParty.Api.Controllers
       {
         guest.PartyGuestId,
         guest.PartyId,
+        guest.UserId,
         guest.GuestName
       });
 
@@ -90,7 +134,15 @@ namespace VideoParty.Api.Controllers
     }
   }
 
-  public record CreatePartyRequest(string Name);
+  public record CreatePartyRequest(string Name, Guid OrganizerUserId);
 
-  public record RegisterGuestRequest(string GuestName);
+  public record RegisterGuestRequest(string GuestName, Guid UserId);
+
+  public enum PartyRole
+  {
+    Organizer,
+    Guest
+  }
+
+  public record PartySummary(Guid PartyId, string Name, PartyRole Role);
 }

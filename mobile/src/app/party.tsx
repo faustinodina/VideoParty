@@ -1,27 +1,27 @@
-import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { joinParty } from '@/store/partySlice';
+import { useAppSelector } from '@/store/hooks';
+import { selectActiveParty } from '@/store/partySlice';
 
 export default function PartyScreen() {
   const theme = useTheme();
-  const dispatch = useAppDispatch();
-  const [partyIdInput, setPartyIdInput] = useState('');
 
-  const joinedPartyId = useAppSelector((state) => state.party.joinedPartyId);
+  const activeParty = useAppSelector(selectActiveParty);
   const guests = useAppSelector((state) => state.party.guests);
 
-  const join = () => {
-    const trimmed = partyIdInput.trim();
-    if (trimmed.length > 0) {
-      dispatch(joinParty(trimmed));
-    }
-  };
+  if (!activeParty) {
+    return (
+      <ThemedView style={styles.placeholder}>
+        <ThemedText themeColor="textSecondary" style={styles.empty}>
+          Open a party from the Parties tab to see it here.
+        </ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <FlatList
@@ -32,29 +32,17 @@ export default function PartyScreen() {
       keyExtractor={(item) => item.partyGuestId}
       ListHeaderComponent={
         <ThemedView style={styles.header}>
-          <ThemedText type="subtitle">Party guests</ThemedText>
-          <TextInput
-            value={partyIdInput}
-            onChangeText={setPartyIdInput}
-            placeholder="Enter party id"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={[
-              styles.input,
-              { color: theme.text, backgroundColor: theme.backgroundElement },
-            ]}
-          />
-          <Pressable
-            onPress={join}
-            style={({ pressed }) => [
-              styles.button,
-              { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
-            ]}>
-            <ThemedText type="link">
-              {joinedPartyId ? 'Joined — listening for guests' : 'Join party'}
+          <ThemedText type="title">{activeParty.name}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            You are {activeParty.role === 'organizer' ? 'the organizer' : 'a guest'} of
+            this party. Share the id below so others can join.
+          </ThemedText>
+          <ThemedView type="backgroundElement" style={styles.idBox}>
+            <ThemedText type="code" selectable>
+              {activeParty.partyId}
             </ThemedText>
-          </Pressable>
+          </ThemedView>
+          <ThemedText type="subtitle">Party guests</ThemedText>
         </ThemedView>
       }
       renderItem={({ item }) => (
@@ -64,9 +52,7 @@ export default function PartyScreen() {
       )}
       ListEmptyComponent={
         <ThemedText themeColor="textSecondary" style={styles.empty}>
-          {joinedPartyId
-            ? 'No guests yet. New registrations will appear here in real time.'
-            : 'Join a party to see guests as they register.'}
+          No guests yet. New registrations will appear here in real time.
         </ThemedText>
       }
     />
@@ -77,10 +63,16 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
   },
+  placeholder: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+  },
   content: {
     gap: Spacing.three,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.four,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
@@ -88,17 +80,12 @@ const styles = StyleSheet.create({
   header: {
     gap: Spacing.three,
   },
-  input: {
+  idBox: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.two,
     borderCurve: 'continuous',
-  },
-  button: {
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderCurve: 'continuous',
-    alignItems: 'center',
+    alignSelf: 'flex-start',
   },
   guestRow: {
     paddingHorizontal: Spacing.three,

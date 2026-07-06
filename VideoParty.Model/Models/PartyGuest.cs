@@ -15,6 +15,9 @@ namespace VideoParty.Model.Models
 
     public Party Party { get; set; } = null!;
 
+    // Device-generated user id of the client that joined as this guest.
+    public required Guid UserId { get; set; }
+
     public required string GuestName { get; set; }
   }
 }
