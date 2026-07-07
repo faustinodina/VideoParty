@@ -1,14 +1,15 @@
-import { FlatList, StyleSheet } from 'react-native';
+import { FlatList, Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppSelector } from '@/store/hooks';
-import { selectActiveParty } from '@/store/partySlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { removeMember, selectActiveParty } from '@/store/partySlice';
 
 export default function PartyScreen() {
   const theme = useTheme();
+  const dispatch = useAppDispatch();
 
   const activeParty = useAppSelector(selectActiveParty);
   const members = useAppSelector((state) => state.party.members);
@@ -57,6 +58,17 @@ export default function PartyScreen() {
               </ThemedText>
             </ThemedView>
           )}
+          {activeParty.role === 'organizer' &&
+            item.userId !== activeParty.organizerUserId && (
+              <Pressable
+                onPress={() => dispatch(removeMember(item))}
+                hitSlop={Spacing.two}
+              >
+                <ThemedText type="small" themeColor="danger">
+                  Remove
+                </ThemedText>
+              </Pressable>
+            )}
         </ThemedView>
       )}
       ListEmptyComponent={

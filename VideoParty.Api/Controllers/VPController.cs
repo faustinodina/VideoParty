@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +9,7 @@ using VideoParty.Model.Models;
 
 namespace VideoParty.Api.Controllers
 {
+  [Authorize]
   [Route("[controller]")]
   [ApiController]
   public class VPController : ControllerBase
@@ -20,6 +23,10 @@ namespace VideoParty.Api.Controllers
       _hub = hub;
     }
 
+    // The authenticated caller, from the JWT's `sub` claim (see AuthController).
+    private Guid CallerUserId =>
+        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
     [HttpGet("parties/{id:guid}", Name = nameof(GetParty))]
     public async Task<ActionResult<Party>> GetParty(Guid id)
     {
@@ -32,10 +39,11 @@ namespace VideoParty.Api.Controllers
       return party;
     }
 
-    // All parties where the user is the organizer or a member, newest first.
-    [HttpGet("users/{userId:guid}/parties")]
-    public async Task<ActionResult<IEnumerable<PartySummary>>> GetUserParties(Guid userId)
+    // All parties where the caller is the organizer or a member, newest first.
+    [HttpGet("me/parties")]
+    public async Task<ActionResult<IEnumerable<PartySummary>>> GetUserParties()
     {
+      var userId = CallerUserId;
       // Two queries combined in memory: EF cannot translate Concat over
       // projections to the PartySummary record.
       var organized = await _db.Parties
@@ -91,7 +99,7 @@ namespace VideoParty.Api.Controllers
       {
         PartyId = Guid.NewGuid(),
         Name = request.Name,
-        OrganizerUserId = request.OrganizerUserId
+        OrganizerUserId = CallerUserId
       };
 
       // The organizer is a participant of their own party; registering them
@@ -102,7 +110,7 @@ namespace VideoParty.Api.Controllers
       {
         PartyMemberId = Guid.NewGuid(),
         PartyId = party.PartyId,
-        UserId = request.OrganizerUserId,
+        UserId = party.OrganizerUserId,
         DisplayName = request.OrganizerName
       };
 
@@ -122,9 +130,11 @@ namespace VideoParty.Api.Controllers
         return NotFound($"Party '{partyId}' was not found.");
       }
 
+      var userId = CallerUserId;
+
       // Joining twice from the same device is a no-op: return the existing member.
       var existing = await _db.PartyMembers
-          .FirstOrDefaultAsync(m => m.PartyId == partyId && m.UserId == request.UserId);
+          .FirstOrDefaultAsync(m => m.PartyId == partyId && m.UserId == userId);
       if (existing is not null)
       {
         return existing;
@@ -134,7 +144,7 @@ namespace VideoParty.Api.Controllers
       {
         PartyMemberId = Guid.NewGuid(),
         PartyId = partyId,
-        UserId = request.UserId,
+        UserId = userId,
         DisplayName = request.DisplayName
       };
 
@@ -154,11 +164,58 @@ namespace VideoParty.Api.Controllers
 
       return CreatedAtAction(nameof(GetMember), new { partyId = partyId, id = member.PartyMemberId }, member);
     }
+
+    // Only the party's organizer may remove members.
+    [HttpDelete("parties/{partyId:guid}/members/{id:guid}")]
+    public async Task<IActionResult> RemoveMember(Guid partyId, Guid id)
+    {
+      var party = await _db.Parties.FindAsync(partyId);
+      if (party is null)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      if (party.OrganizerUserId != CallerUserId)
+      {
+        return StatusCode(StatusCodes.Status403Forbidden,
+            "Only the organizer can remove members from this party.");
+      }
+
+      var member = await _db.PartyMembers
+          .FirstOrDefaultAsync(m => m.PartyId == partyId && m.PartyMemberId == id);
+      if (member is null)
+      {
+        return NotFound($"Member '{id}' was not found in party '{partyId}'.");
+      }
+
+      // The organizer's member row is what keeps them in their own party's
+      // members list; removing it would leave the party without a participant.
+      if (member.UserId == party.OrganizerUserId)
+      {
+        return BadRequest("The organizer cannot be removed from their own party.");
+      }
+
+      _db.PartyMembers.Remove(member);
+      await _db.SaveChangesAsync();
+
+      // Same shape as MemberJoined so clients reuse the PartyMember type.
+      await _hub.Clients.Group(partyId.ToString()).SendAsync("MemberRemoved", new
+      {
+        member.PartyMemberId,
+        member.PartyId,
+        member.UserId,
+        member.DisplayName,
+        member.CreatedAt,
+        member.UpdatedAt
+      });
+
+      return NoContent();
+    }
   }
 
-  public record CreatePartyRequest(string Name, Guid OrganizerUserId, string OrganizerName);
+  public record CreatePartyRequest(string Name, string OrganizerName);
 
-  public record RegisterMemberRequest(string DisplayName, Guid UserId);
+  public record RegisterMemberRequest(string DisplayName);
 
   public enum PartyRole
   {

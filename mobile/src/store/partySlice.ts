@@ -8,9 +8,9 @@ import {
   PartyMember,
   PartySummary,
   registerMember,
+  removeMember as removeMemberApi,
 } from "@/services/partyApi";
 import signalR from "@/services/signalRService";
-import { getUserId } from "@/services/userIdentity";
 import type { RootState } from "@/store";
 
 interface PartyState {
@@ -45,10 +45,9 @@ function deviceDisplayName() {
   return Device.deviceName ?? "Guest";
 }
 
-export const fetchParties = createAsyncThunk("party/fetchAll", async () => {
-  const userId = await getUserId();
-  return getUserParties(userId);
-});
+export const fetchParties = createAsyncThunk("party/fetchAll", () =>
+  getUserParties()
+);
 
 // Creates the party on the API (which registers the organizer as its first
 // member), then joins its SignalR group so this client receives the party's
@@ -56,8 +55,7 @@ export const fetchParties = createAsyncThunk("party/fetchAll", async () => {
 export const createParty = createAsyncThunk(
   "party/create",
   async (name: string) => {
-    const userId = await getUserId();
-    const party = await createPartyApi(name, userId, deviceDisplayName());
+    const party = await createPartyApi(name, deviceDisplayName());
     await signalR.joinParty(party.partyId);
     const members = await getMembers(party.partyId);
     const summary: PartySummary = {
@@ -76,13 +74,23 @@ export const createParty = createAsyncThunk(
 export const joinParty = createAsyncThunk(
   "party/join",
   async (partyId: string, { dispatch }) => {
-    const userId = await getUserId();
-    const member = await registerMember(partyId, deviceDisplayName(), userId);
+    const member = await registerMember(partyId, deviceDisplayName());
     await signalR.joinParty(member.partyId);
     // The register response has no party name; refresh the list to get it.
     await dispatch(fetchParties());
     const members = await getMembers(member.partyId);
     return { partyId: member.partyId, members };
+  }
+);
+
+// Organizer removes a member from the active party. The API broadcasts
+// MemberRemoved to the party group, but the fulfilled reducer also removes
+// the row locally so the organizer sees it go without the round trip.
+export const removeMember = createAsyncThunk(
+  "party/removeMember",
+  async (member: PartyMember) => {
+    await removeMemberApi(member.partyId, member.partyMemberId);
+    return member;
   }
 );
 
@@ -114,6 +122,32 @@ const partySlice = createSlice({
         )
       ) {
         state.members.push(action.payload);
+      }
+    },
+    // Dispatched from the app-level SignalR subscription when someone else
+    // was removed from a party. Filtering is idempotent, so the organizer
+    // receiving the echo of their own removal is harmless.
+    memberRemoved(state, action: PayloadAction<PartyMember>) {
+      if (
+        state.activePartyId &&
+        action.payload.partyId.toLowerCase() ===
+          state.activePartyId.toLowerCase()
+      ) {
+        state.members = state.members.filter(
+          (m) => m.partyMemberId !== action.payload.partyMemberId
+        );
+      }
+    },
+    // This device's user was removed by the organizer: drop the party from
+    // the list and close it if it is the one currently open.
+    removedFromParty(state, action: PayloadAction<PartyMember>) {
+      const partyId = action.payload.partyId.toLowerCase();
+      state.parties = state.parties.filter(
+        (p) => p.partyId.toLowerCase() !== partyId
+      );
+      if (state.activePartyId?.toLowerCase() === partyId) {
+        state.activePartyId = null;
+        state.members = [];
       }
     },
   },
@@ -158,6 +192,11 @@ const partySlice = createSlice({
         state.joining = false;
         state.joinError = action.error.message ?? "Something went wrong";
       })
+      .addCase(removeMember.fulfilled, (state, action) => {
+        state.members = state.members.filter(
+          (m) => m.partyMemberId !== action.payload.partyMemberId
+        );
+      })
       .addCase(openParty.fulfilled, (state, action) => {
         // Always replace: re-opening the same party refreshes its members.
         state.activePartyId = action.payload.partyId;
@@ -170,5 +209,6 @@ export const selectActiveParty = (state: RootState) =>
   state.party.parties.find((p) => p.partyId === state.party.activePartyId) ??
   null;
 
-export const { memberJoined } = partySlice.actions;
+export const { memberJoined, memberRemoved, removedFromParty } =
+  partySlice.actions;
 export default partySlice.reducer;

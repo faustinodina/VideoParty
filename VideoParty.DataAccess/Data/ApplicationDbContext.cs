@@ -18,6 +18,7 @@ namespace VideoParty.DataAccess.Data
 
     public DbSet<Party> Parties { get; set; }
     public DbSet<PartyMember> PartyMembers { get; set; }
+    public DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

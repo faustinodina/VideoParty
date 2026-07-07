@@ -1,0 +1,58 @@
+About authentication: I'd like the users where automatically authenticated by its UserId. No need to maintain user password. Is it possible?                                                                                                                                 
+● Yes — it's not only possible, it's a well-established pattern ("anonymous auth" / "guest accounts", what Firebase Anonymous Auth or game guest logins do). But there's one important catch in your current design you'd have to fix first.
+
+  The idea
+
+  If there's no password, then knowing the UserId is the credential. That actually works: your device GUIDs are 128-bit random values, unguessable by brute force. The model becomes "whoever presents this GUID is that user" — the same trust model as an API key. Reasonable  trade-offs for this app: no accounts to manage, no login screen, but also no recovery (clear app storage = new identity) and no multi-device users. All fine for the current stage.
+
+  The catch: your UserId is currently public
+
+  A credential only authenticates if it stays secret, and today the UserId is broadcast to everyone:
+
+  - GetMembers and the MemberJoined/MemberRemoved SignalR payloads include each member's UserId — every party member sees everyone else's.
+  - Party.OrganizerUserId is exposed too, so any guest could impersonate the organizer — e.g., call the new RemoveMember endpoint with the organizer's id as requesterUserId.
+
+  The client also relies on these being visible (the Organizer badge and "is this me" checks compare userIds). So you can't just declare UserId secret.
+
+  The clean way to do it
+
+  Split identity from credential:
+
+  1. UserId stays the public identifier — fine to show in member lists, used for organizer checks.
+  2. Add a device secret — on first launch the app calls POST /users (or it happens implicitly on first create/join); the server creates a User row and returns a random token. The device stores both in AsyncStorage, like it stores UserId today.
+  3. Send the token, not the UserId, to prove identity — either directly as a header (Authorization: Bearer <token>) validated by a small custom authentication handler, or exchanged for a short-lived JWT (ASP.NET's standard JWT bearer middleware). Your SignalR client is
+  already wired for this — the accessTokenFactory in signalRService.ts currently returns a placeholder "your-jwt-token".
+  4. The server stops trusting client-supplied ids — OrganizerUserId in CreateParty, UserId in RegisterMember, and the requesterUserId query param on RemoveMember all disappear; the server takes the caller's identity from the validated token (HttpContext.User). That's a
+  nice API cleanup, not just security.
+
+  A bonus with the JWT route: SignalR gets Context.UserIdentifier, so the server can address clients by user (Clients.User(...)) — which would let the API push the kicked user out of the party group server-side, the thing we skipped last time.
+
+  If you want it even simpler, there's a lazier variant — treat the UserId itself as the secret and scrub it from all responses (key member lists by PartyMemberId only, add an isOrganizer/isMe flag computed server-side). Fewer moving parts, but it couples "identify" and
+  "authenticate" in one value forever, and migrating later is more painful than adding the token now.
+
+  My recommendation: option with the separate device token + JWT exchange. It's maybe a day of work, touches nothing the user sees, and when you eventually want real accounts you only swap how the token is obtained (login instead of auto-registration) — everything
+  downstream stays.
+
+  Want me to implement it?
+
+  -----------------------------------------------------------------------------------------------
+  ● Done — device-token + JWT auth is implemented end to end, and a live smoke test passed all 10 checks (register, token issue, wrong-secret rejection, 401 without token, organizer-from-token on create/join, 403 for guest removal, 400 for organizer self-removal, 204 for
+  organizer removing a guest).
+
+  How it works now:
+  - On first launch the app calls POST /auth/register and receives { userId, secret }; only the SHA-256 hash of the secret is stored server-side (new Users table, migration AddUsers applied). The device persists both in AsyncStorage.
+  - The app exchanges the secret at POST /auth/token for an 8-hour JWT whose sub claim is the userId. userIdentity.ts caches it and refreshes near expiry; partyApi.ts attaches it as a Bearer header and retries once on 401; the SignalR accessTokenFactory now returns the
+  real token (query-string on WebSockets, handled in Program.cs).
+  - VPController and UserHub are [Authorize]-protected, and the server takes the caller's identity from the token: CreatePartyRequest lost OrganizerUserId, RegisterMemberRequest lost UserId, RemoveMember lost requesterUserId, and GET /VP/users/{id}/parties became GET
+  /VP/me/parties. Impersonating the organizer is no longer possible.
+
+  Things you should know:
+  1. Your existing dev data is orphaned. The old device GUID has no server credentials, so the app registers a fresh identity on next launch — previously created parties won't show in the list. Wiping videoparty.db for a clean start is the easy path if that data doesn't
+  matter.
+  2. The JWT signing key sits in appsettings.json — fine for dev, but move it to user-secrets/environment config before anything public-facing.
+  3. Pre-existing warning, not from this change: NuGet flags transitive Microsoft.OpenApi 2.0.0 with a high-severity advisory (NU1903); bumping it is a one-liner if you want it gone.
+  4. The smoke test ran against a scratch database (via a ConnectionStrings__DefaultConnection override), so your dev DB has the new schema but no test junk. One gotcha I hit and noted for the future: the dev DB is in SQLite WAL mode, so copying just videoparty.db loses
+  whatever's still in the -wal file.
+
+  Build, TypeScript, and lint are all clean, and no stray API processes are left running.
+  

@@ -6,6 +6,7 @@ import {
 
 import { HUB_URL } from "@/constants/config";
 import type { PartyMember } from "@/services/partyApi";
+import { getAccessToken } from "@/services/userIdentity";
 
 class SignalRService {
   private connection: HubConnection | null = null;
@@ -20,7 +21,9 @@ class SignalRService {
 
     this.connection = new HubConnectionBuilder()
       .withUrl(HUB_URL, {
-        accessTokenFactory: () => "your-jwt-token",
+        // Sent as ?access_token=… on WebSocket requests; the API's JWT
+        // bearer setup reads it from there for hub paths.
+        accessTokenFactory: () => getAccessToken(),
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Information)
@@ -63,6 +66,19 @@ class SignalRService {
     }
   }
 
+  // Leave a party group after losing membership (e.g. removed by the
+  // organizer). Also forgets the party so an automatic reconnect doesn't
+  // silently re-join its group.
+  async leaveParty(partyId: string) {
+    if (this.currentPartyId?.toLowerCase() === partyId.toLowerCase()) {
+      this.currentPartyId = null;
+    }
+
+    if (this.connection?.state === "Connected") {
+      await this.connection.invoke("LeaveParty", partyId);
+    }
+  }
+
   private async rejoinCurrentParty() {
     if (this.currentPartyId && this.connection?.state === "Connected") {
       await this.connection.invoke("JoinParty", this.currentPartyId);
@@ -93,6 +109,13 @@ class SignalRService {
   onMemberJoined(callback: (member: PartyMember) => void) {
     this.on("MemberJoined", callback);
     return () => this.off("MemberJoined", callback);
+  }
+
+  // Broadcast by the API when the organizer removes a member; the payload is
+  // the removed member, same PartyMember shape as MemberJoined.
+  onMemberRemoved(callback: (member: PartyMember) => void) {
+    this.on("MemberRemoved", callback);
+    return () => this.off("MemberRemoved", callback);
   }
 
   async disconnect() {

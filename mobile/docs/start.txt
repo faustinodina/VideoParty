@@ -1,0 +1,40 @@
+TO START emulator + device:
+===========================
+
+ Everything you need runs from ordinary terminals, so in VS Code you just open a few terminal tabs (the + button or Ctrl+Shift+` ) 
+ and run one piece per tab. 
+ Here are the exact commands, in PowerShell syntax since that's the VS Code default on Windows:
+
+  Terminal 1 — the API server (from the repo root):
+  -------------------------------------------------
+
+  dotnet run --project VideoParty.Api --launch-profile http
+
+  Terminal 2 — the emulator:
+  --------------------------
+
+    & "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Pixel_9_API_35
+    emulator -avd Pixel_9_API_35
+
+  This blocks the terminal for the emulator's lifetime, which is fine in its own tab. Skip this step when the emulator is already running.
+
+  Terminal 3 — Metro (one process serves both devices):
+  -----------------------------------------------------
+
+  cd mobile
+  npx expo start
+
+  Once Metro is up, launching each instance is done from inside this terminal — it's interactive:
+
+  - Press a — opens the app on the first Android device it finds (usually the emulator).
+  - Press Shift+A — shows a picker listing all connected devices (emulator and your phone), so you run it once, choose the phone, and now both are running.
+
+  Expo CLI automatically runs adb reverse tcp:8081 for every connected device, so the Metro connection over USB needs no manual setup. The one thing it does not forward is your API port, so for the phone run this once per USB connection (any terminal):
+
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" -s R58N60THKPR reverse tcp:5070 tcp:5070
+
+  Two conveniences worth mentioning:
+
+  - If you add %LOCALAPPDATA%\Android\Sdk\platform-tools and ...\Sdk\emulator to your PATH, 
+      the commands shorten to just adb ... and emulator -avd Pixel_9_API_35.
+  - All of this can be wrapped in a VS Code tasks.json so a single "Run Task" starts the API, emulator, and Metro in separate panels automatically.

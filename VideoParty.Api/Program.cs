@@ -1,6 +1,9 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using VideoParty.Api.Hubs;
 using VideoParty.DataAccess.Data;
 
@@ -21,6 +24,39 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddSignalR();
 
+// Bearer JWTs issued by AuthController (see its comment for the device-token
+// scheme). The same token authenticates REST calls and the SignalR hub.
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+      options.TokenValidationParameters = new TokenValidationParameters
+      {
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+      };
+
+      // Browsers cannot set headers on WebSocket requests, so the SignalR
+      // client sends the token as a query parameter on hub requests.
+      options.Events = new JwtBearerEvents
+      {
+        OnMessageReceived = context =>
+        {
+          var accessToken = context.Request.Query["access_token"];
+          if (!string.IsNullOrEmpty(accessToken) &&
+              context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+          {
+            context.Token = accessToken;
+          }
+          return Task.CompletedTask;
+        }
+      };
+    });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -33,6 +69,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
