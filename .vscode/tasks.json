@@ -1,0 +1,79 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "API: run",
+      "type": "shell",
+      "command": "dotnet run --project VideoParty.Api --launch-profile http",
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "videoparty"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Emulator: Pixel 9",
+      "type": "shell",
+      "command": "if (& \"$env:LOCALAPPDATA\\Android\\Sdk\\platform-tools\\adb.exe\" devices | Select-String 'emulator-\\d+\\s+device') { Write-Host 'Emulator already running, skipping.' } else { & \"$env:LOCALAPPDATA\\Android\\Sdk\\emulator\\emulator.exe\" -avd Pixel_9_API_35 }",
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "videoparty"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "adb reverse: API port",
+      "type": "shell",
+      "command": "$adb = \"$env:LOCALAPPDATA\\Android\\Sdk\\platform-tools\\adb.exe\"; (& $adb devices) | Select-String '^(\\S+)\\s+device$' | ForEach-Object { $s = $_.Matches[0].Groups[1].Value; & $adb -s $s reverse tcp:5070 tcp:5070 | Out-Null; Write-Host \"Forwarded API port 5070 on $s\" }",
+      "presentation": {
+        "panel": "shared",
+        "group": "videoparty",
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Metro: expo start",
+      "type": "shell",
+      "command": "npx expo start",
+      "options": {
+        "cwd": "${workspaceFolder}/mobile"
+      },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "videoparty",
+        "focus": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start Mobile (Emulator + Metro, API from Visual Studio)",
+      "dependsOn": [
+        "Emulator: Pixel 9",
+        "adb reverse: API port",
+        "Metro: expo start"
+      ],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start All (API + Emulator + Metro)",
+      "dependsOn": [
+        "API: run",
+        "Emulator: Pixel 9",
+        "adb reverse: API port",
+        "Metro: expo start"
+      ],
+      "dependsOrder": "parallel",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}
