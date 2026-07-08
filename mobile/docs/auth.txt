@@ -47,12 +47,19 @@ About authentication: I'd like the users where automatically authenticated by it
   /VP/me/parties. Impersonating the organizer is no longer possible.
 
   Things you should know:
-  1. Your existing dev data is orphaned. The old device GUID has no server credentials, so the app registers a fresh identity on next launch — previously created parties won't show in the list. Wiping videoparty.db for a clean start is the easy path if that data doesn't
-  matter.
+  1. Your existing dev data is orphaned. The old device GUID has no server credentials, 
+      so the app registers a fresh identity on next launch — previously created parties won't show in the list. 
+      Wiping videoparty.db for a clean start is the easy path if that data doesn't  matter.
+  
   2. The JWT signing key sits in appsettings.json — fine for dev, but move it to user-secrets/environment config before anything public-facing.
-  3. Pre-existing warning, not from this change: NuGet flags transitive Microsoft.OpenApi 2.0.0 with a high-severity advisory (NU1903); bumping it is a one-liner if you want it gone.
-  4. The smoke test ran against a scratch database (via a ConnectionStrings__DefaultConnection override), so your dev DB has the new schema but no test junk. One gotcha I hit and noted for the future: the dev DB is in SQLite WAL mode, so copying just videoparty.db loses
-  whatever's still in the -wal file.
+  
+  3. Pre-existing warning, not from this change: NuGet flags transitive Microsoft.OpenApi 2.0.0 with a high-severity advisory (NU1903); 
+      bumping it is a one-liner if you want it gone.
+  
+  4. The smoke test ran against a scratch database (via a ConnectionStrings__DefaultConnection override), 
+      so your dev DB has the new schema but no test junk. 
+      One gotcha I hit and noted for the future: 
+        the dev DB is in SQLite WAL mode, so copying just videoparty.db loses whatever's still in the -wal file.
 
   Build, TypeScript, and lint are all clean, and no stray API processes are left running.
   
