@@ -29,6 +29,25 @@ interface AccessToken {
 let credentialsPromise: Promise<DeviceCredentials> | null = null;
 let tokenPromise: Promise<AccessToken> | null = null;
 
+// Listeners for identity resets (see fetchToken); the app layout subscribes
+// to tell the user their previous identity is gone.
+let identityResetListeners: (() => void)[] = [];
+
+/**
+ * Subscribes to identity resets: the server rejected this device's stored
+ * credentials (e.g. the database was recreated) and a fresh identity was
+ * registered in their place. Party memberships of the old identity are lost.
+ * Returns an unsubscribe function for cleanup.
+ */
+export function onIdentityReset(listener: () => void): () => void {
+  identityResetListeners.push(listener);
+  return () => {
+    identityResetListeners = identityResetListeners.filter(
+      (l) => l !== listener
+    );
+  };
+}
+
 /** Public identifier of this device's user (safe to show and compare). */
 export function getUserId(): Promise<string> {
   return getCredentials().then((credentials) => credentials.userId);
@@ -69,13 +88,20 @@ async function settledToken(): Promise<AccessToken | null> {
 }
 
 async function fetchToken(): Promise<AccessToken> {
-  const { userId, secret } = await getCredentials();
+  let response = await requestToken(await getCredentials());
 
-  const response = await fetch(`${API_BASE_URL}/auth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, secret }),
-  });
+  // 401 means the server no longer knows this identity (e.g. the dev
+  // database was recreated). The stored credentials are useless, so discard
+  // them, register a fresh identity and retry once.
+  if (response.status === 401) {
+    credentialsPromise = null;
+    await AsyncStorage.removeItem(CREDENTIALS_KEY);
+
+    response = await requestToken(await getCredentials());
+    for (const listener of identityResetListeners) {
+      listener();
+    }
+  }
 
   if (!response.ok) {
     throw new Error(`Token request failed: HTTP ${response.status}`);
@@ -83,6 +109,14 @@ async function fetchToken(): Promise<AccessToken> {
 
   const { accessToken, expiresAt } = await response.json();
   return { token: accessToken, expiresAt: Date.parse(expiresAt) };
+}
+
+function requestToken({ userId, secret }: DeviceCredentials) {
+  return fetch(`${API_BASE_URL}/auth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, secret }),
+  });
 }
 
 function getCredentials(): Promise<DeviceCredentials> {

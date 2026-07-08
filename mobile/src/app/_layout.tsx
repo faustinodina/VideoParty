@@ -1,14 +1,15 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
+import { Alert, Platform, useColorScheme } from "react-native";
 import { Provider } from "react-redux";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
 import signalR from "@/services/signalRService";
-import { getUserId } from "@/services/userIdentity";
+import { getUserId, onIdentityReset } from "@/services/userIdentity";
 import { store } from "@/store";
 import {
+  fetchParties,
   memberJoined,
   memberRemoved,
   removedFromParty,
@@ -39,11 +40,28 @@ export default function TabLayout() {
       }
     });
 
+    // The server rejected this device's stored credentials and a fresh
+    // identity was registered (see userIdentity): tell the user their
+    // previous parties are gone and refresh the list for the new identity.
+    const unsubscribeReset = onIdentityReset(() => {
+      const title = "Device re-registered";
+      const message =
+        "The server no longer recognized this device, so it was registered " +
+        "as a new user. Parties you belonged to are no longer accessible.";
+      if (Platform.OS === "web") {
+        window.alert(`${title}\n\n${message}`);
+      } else {
+        Alert.alert(title, message);
+      }
+      store.dispatch(fetchParties());
+    });
+
     signalR.connect();
 
     return () => {
       unsubscribeJoined();
       unsubscribeRemoved();
+      unsubscribeReset();
       signalR.disconnect();
     };
   }, []);
