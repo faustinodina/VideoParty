@@ -13,8 +13,12 @@ TO START emulator + device:
   Terminal 2 — the emulator:
   --------------------------
 
-    & "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Pixel_9_API_35
-    emulator -avd Pixel_9_API_35
+    - Run emulator
+        emulator -avd Pixel_9_API_35
+    - Redirect any connection from the emulator toward the hosting machine
+        adb -s emulator-5554 reverse tcp:8081 tcp:8081
+    - Verify the command was done
+        adb -s emulator-5554 reverse --list
 
   This blocks the terminal for the emulator's lifetime, which is fine in its own tab. Skip this step when the emulator is already running.
 

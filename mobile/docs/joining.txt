@@ -1,0 +1,28 @@
+ Just thinking, do not do modify anything yet: Can it be implemented a button from the organizer app that sends a SMS inviting people to join the party? The text of the SMS would include a link that will install/activate VideoParty and open the dialog for joining the     party
+
+● Yes, it's implementable — but it splits into three parts of very different difficulty, and one of them ("install, then open the join dialog") is the classic hard problem of mobile growth flows. Here's the honest breakdown:
+
+  Part 1: The SMS itself — easy.
+  You don't send SMS programmatically (iOS forbids it outright; Android requires being the SMS handler). Instead, expo-sms (SMS.sendSMSAsync) opens the user's SMS composer prefilled with recipients and text — the organizer just hits send. No permissions needed, works on
+  both platforms. Optionally pair it with expo-contacts for a recipient picker, or skip SMS-specificity entirely and use the native share sheet (Share.share), which gets you WhatsApp/Telegram/email for free — SMS is just one of the targets. A "Invite via SMS" button on
+  the Party tab (organizer-only) is trivial.
+
+  Part 2: Link opens the join dialog when the app is installed — easy to moderate.
+  Expo Router maps URLs to routes automatically. A route like join/[partyId] plus the app scheme in app.json means videoparty://join/abc123 opens the app on that screen, where you'd prefill/trigger the existing joinParty flow (it's a one-tap confirm rather than
+  auto-join, so a forwarded link can't silently enroll someone). The production-grade version uses an HTTPS link instead (https://yourdomain.com/join/abc123) via Android App Links + iOS Universal Links — same link works as a website and as an app-opener, but requires
+  owning a domain and hosting verification files (assetlinks.json, apple-app-site-association). For today's dev setup, Expo Go understands exp://192.168.1.3:8081/--/join/abc123, so the whole flow is prototypable right now.
+
+  Part 3: "Install/activate first, then join the party" — the hard part.
+  Two separate obstacles:
+
+  - There's nothing to install yet. The app currently runs inside Expo Go. A link that installs VideoParty presupposes a standalone build distributed through Play Store / App Store (or at least an APK link for Android testing). That's an EAS build + store presence — a
+  project milestone of its own.
+  - Deferred deep linking. When the recipient doesn't have the app, the link goes to the store — and the party id is lost during install, because stores don't pass URLs through. Solutions: on Android, the Play Install Referrer API can smuggle the party id through the
+  store; on iOS there's no clean native mechanism — everyone uses a service (Branch.io, AppsFlyer) or clipboard heuristics. Notably, Firebase Dynamic Links — the old free answer — was sunset in August 2025.
+
+  The pragmatic architecture (what I'd actually build, in order): the SMS contains one HTTPS link to a tiny landing page your API serves, e.g. GET /join/{partyId}. If the app is installed, App Links/Universal Links intercept and the page is never seen. If not, the page
+  shows the party name ("Fausto invited you to Movie Night") with store buttons — and after install, worst case, the user taps the SMS link again, which now opens the app directly. That "tap the link again" fallback dodges deferred deep linking entirely, at the cost of
+  one extra tap for first-time installers, and you can bolt on the install-referrer trick for Android later.
+
+  Phasing: (1) invite button + SMS composer + deep-link route — doable now, testable in Expo Go, roughly a day; (2) landing page on the API — small; (3) standalone builds + store listing + App/Universal Link verification — the real lift; (4) true deferred deep linking
+  via Branch/referrer — optional polish. Parts 1–2 are worth doing whenever you like; they're not throwaway, since the link format survives into production.
