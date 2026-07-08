@@ -30,13 +30,20 @@ namespace VideoParty.Api.Controllers
     // Creates a new user identity. The plaintext secret is returned exactly
     // once, here; only its hash is stored.
     [HttpPost("register")]
-    public async Task<ActionResult<RegisterResponse>> Register()
+    public async Task<ActionResult<RegisterResponse>> Register(RegisterRequest request)
     {
+      var name = request.Name?.Trim();
+      if (string.IsNullOrEmpty(name))
+      {
+        return BadRequest("A name is required.");
+      }
+
       var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
       var user = new User
       {
         UserId = Guid.NewGuid(),
+        Name = name,
         SecretHash = HashSecret(secret)
       };
 
@@ -85,6 +92,8 @@ namespace VideoParty.Api.Controllers
             Encoding.UTF8.GetBytes(HashSecret(secret)),
             Encoding.UTF8.GetBytes(storedHash));
   }
+
+  public record RegisterRequest(string? Name);
 
   public record RegisterResponse(Guid UserId, string Secret);
 

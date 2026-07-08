@@ -1,12 +1,13 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Platform, useColorScheme } from "react-native";
 import { Provider } from "react-redux";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
+import RegisterScreen from "@/components/register-screen";
 import signalR from "@/services/signalRService";
-import { getUserId, onIdentityReset } from "@/services/userIdentity";
+import { getUserId, isRegistered, onIdentityReset } from "@/services/userIdentity";
 import { store } from "@/store";
 import {
   fetchParties,
@@ -18,7 +19,18 @@ import {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
+  // null while the stored credentials are being read; false shows the
+  // first-launch registration screen instead of the app.
+  const [registered, setRegistered] = useState<boolean | null>(null);
+
   useEffect(() => {
+    isRegistered().then(setRegistered);
+  }, []);
+
+  useEffect(() => {
+    // Everything below needs an identity: SignalR's token fetch would
+    // otherwise fail (and auto-register) before the user chose a name.
+    if (!registered) return;
     signalR.on("VideoStarted", (videoId) => {
       console.log("Playing video:", videoId);
     });
@@ -64,13 +76,16 @@ export default function TabLayout() {
       unsubscribeReset();
       signalR.disconnect();
     };
-  }, []);
+  }, [registered]);
 
   return (
     <Provider store={store}>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <AnimatedSplashOverlay />
-        <AppTabs />
+        {registered === false && (
+          <RegisterScreen onRegistered={() => setRegistered(true)} />
+        )}
+        {registered && <AppTabs />}
       </ThemeProvider>
     </Provider>
   );

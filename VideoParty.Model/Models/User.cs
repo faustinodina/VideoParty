@@ -10,6 +10,9 @@ namespace VideoParty.Model.Models
     [Key]
     public required Guid UserId { get; set; }
 
+    // Human-friendly name, asked on the device when the identity is created.
+    public required string Name { get; set; }
+
     // SHA-256 of the device secret, uppercase hex.
     public required string SecretHash { get; set; }
 

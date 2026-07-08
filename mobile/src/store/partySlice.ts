@@ -11,6 +11,7 @@ import {
   removeMember as removeMemberApi,
 } from "@/services/partyApi";
 import signalR from "@/services/signalRService";
+import { getUserName } from "@/services/userIdentity";
 import type { RootState } from "@/store";
 
 interface PartyState {
@@ -40,9 +41,10 @@ const initialState: PartyState = {
   members: [],
 };
 
-// The only display name available until user profiles exist.
-function deviceDisplayName() {
-  return Device.deviceName ?? "Guest";
+// The name the user registered under; device name on installs registered
+// before names existed.
+async function displayName() {
+  return (await getUserName()) ?? Device.deviceName ?? "Guest";
 }
 
 export const fetchParties = createAsyncThunk("party/fetchAll", () =>
@@ -55,7 +57,7 @@ export const fetchParties = createAsyncThunk("party/fetchAll", () =>
 export const createParty = createAsyncThunk(
   "party/create",
   async (name: string) => {
-    const party = await createPartyApi(name, deviceDisplayName());
+    const party = await createPartyApi(name, await displayName());
     await signalR.joinParty(party.partyId);
     const members = await getMembers(party.partyId);
     const summary: PartySummary = {
@@ -74,7 +76,7 @@ export const createParty = createAsyncThunk(
 export const joinParty = createAsyncThunk(
   "party/join",
   async (partyId: string, { dispatch }) => {
-    const member = await registerMember(partyId, deviceDisplayName());
+    const member = await registerMember(partyId, await displayName());
     await signalR.joinParty(member.partyId);
     // The register response has no party name; refresh the list to get it.
     await dispatch(fetchParties());
