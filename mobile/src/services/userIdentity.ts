@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Device from "expo-device";
 
 import { API_BASE_URL } from "@/constants/config";
 
@@ -17,8 +16,7 @@ const CREDENTIALS_KEY = "videoparty.credentials";
 interface DeviceCredentials {
   userId: string;
   secret: string;
-  /** Absent on installs registered before names existed. */
-  name?: string;
+  name: string;
 }
 
 interface AccessToken {
@@ -81,9 +79,9 @@ export function getUserId(): Promise<string> {
   return getCredentials().then((credentials) => credentials.userId);
 }
 
-/** The name the user registered under; null on pre-name installs. */
-export function getUserName(): Promise<string | null> {
-  return getCredentials().then((credentials) => credentials.name ?? null);
+/** The name the user registered under. */
+export function getUserName(): Promise<string> {
+  return getCredentials().then((credentials) => credentials.name);
 }
 
 /** Bearer token for API and SignalR calls; re-fetched near expiry. */
@@ -128,9 +126,7 @@ async function fetchToken(): Promise<AccessToken> {
   // database was recreated). The stored credentials are useless, so discard
   // them, register a fresh identity under the same name and retry once.
   if (response.status === 401) {
-    const registration = registerIdentity(
-      credentials.name ?? Device.deviceName ?? "Guest"
-    );
+    const registration = registerIdentity(credentials.name);
     credentialsPromise = registration;
     let fresh: DeviceCredentials;
     try {

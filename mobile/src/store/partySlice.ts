@@ -1,5 +1,4 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import * as Device from "expo-device";
 
 import {
   createParty as createPartyApi,
@@ -41,11 +40,6 @@ const initialState: PartyState = {
   members: [],
 };
 
-// The name the user registered under; device name on installs registered
-// before names existed.
-async function displayName() {
-  return (await getUserName()) ?? Device.deviceName ?? "Guest";
-}
 
 export const fetchParties = createAsyncThunk("party/fetchAll", () =>
   getUserParties()
@@ -57,7 +51,7 @@ export const fetchParties = createAsyncThunk("party/fetchAll", () =>
 export const createParty = createAsyncThunk(
   "party/create",
   async (name: string) => {
-    const party = await createPartyApi(name, await displayName());
+    const party = await createPartyApi(name, await getUserName());
     await signalR.joinParty(party.partyId);
     const members = await getMembers(party.partyId);
     const summary: PartySummary = {
@@ -76,7 +70,7 @@ export const createParty = createAsyncThunk(
 export const joinParty = createAsyncThunk(
   "party/join",
   async (partyId: string, { dispatch }) => {
-    const member = await registerMember(partyId, await displayName());
+    const member = await registerMember(partyId, await getUserName());
     await signalR.joinParty(member.partyId);
     // The register response has no party name; refresh the list to get it.
     await dispatch(fetchParties());
