@@ -1,4 +1,5 @@
-import { FlatList, Pressable, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { FlatList, Platform, Pressable, Share, StyleSheet } from 'react-native';
 
 import AppHeader from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +15,32 @@ export default function PartyScreen() {
 
   const activeParty = useAppSelector(selectActiveParty);
   const members = useAppSelector((state) => state.party.members);
+
+  // Web-only fallback feedback: set when the invitation was copied to the
+  // clipboard because the browser has no share dialog.
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
+  const shareParty = async () => {
+    if (!activeParty) return;
+    const message =
+      `Join my party "${activeParty.name}" on VideoParty! ` +
+      `Party id: ${activeParty.partyId}`;
+
+    try {
+      if (Platform.OS === 'web') {
+        if (navigator.share) {
+          await navigator.share({ text: message });
+        } else {
+          await navigator.clipboard.writeText(message);
+          setCopiedInvite(true);
+        }
+      } else {
+        await Share.share({ message });
+      }
+    } catch {
+      // Dismissing the share dialog rejects on some platforms; not an error.
+    }
+  };
 
   if (!activeParty) {
     return (
@@ -49,6 +76,24 @@ export default function PartyScreen() {
                 {activeParty.partyId}
               </ThemedText>
             </ThemedView>
+            {activeParty.role === 'organizer' && (
+              <Pressable
+                onPress={shareParty}
+                style={({ pressed }) => [
+                  styles.shareButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <ThemedText type="smallBold" style={styles.shareButtonLabel}>
+                  Share Party
+                </ThemedText>
+              </Pressable>
+            )}
+            {copiedInvite && (
+              <ThemedText type="small" themeColor="textSecondary">
+                Invitation copied to the clipboard.
+              </ThemedText>
+            )}
             <ThemedText type="subtitle">Members</ThemedText>
           </ThemedView>
         }
@@ -117,6 +162,19 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     borderCurve: 'continuous',
     alignSelf: 'flex-start',
+  },
+  shareButton: {
+    backgroundColor: '#208AEF',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.three,
+    alignSelf: 'flex-start',
+  },
+  shareButtonLabel: {
+    color: '#ffffff',
+  },
+  pressed: {
+    opacity: 0.7,
   },
   memberRow: {
     flexDirection: 'row',
