@@ -1,0 +1,18 @@
+The join-by-link route is built and verified end-to-end on the emulator. Here's what changed:
+
+  New route structure. NativeTabs can only display tab routes, so the app gained the standard Expo Router shape: a root Stack (headerless) in _layout.tsx, the two tab screens moved  into src/app/(tabs)/ with a tiny layout that renders the existing AppTabs, and the new screen at src/app/join/[partyId].tsx. URLs are unchanged — groups are invisible in paths.
+
+  The join screen dispatches the existing joinParty thunk and redirects to the Party tab on success; on failure it shows the API's error with a "Go to Parties" button. The share
+  message now reads: Join my party "name" on VideoParty! / Tap to join: videoparty://join/<id> / Or paste this id into Join Party: <id> — the id fallback matters because some
+  messengers don't make custom-scheme links tappable.
+
+  Verified on the emulator (with your API and Metro): a link with a real party id joined and landed on the Party tab showing the members; a bogus id showed "Could not join — HTTP
+  404"; "Go to Parties" navigates home. Your phone will pick everything up on next reload — no rebuild needed, since the scheme was already in the installed dev client.
+
+  One detour worth knowing about: after I moved the route files, the app went black and / became "Unmatched Route" — Metro's cached route tree doesn't survive moving route files,
+  and it even generated wrong route types. Restarting Metro with --clear fixed it (I killed your expo start and am running one in the background now). Saved to memory: after
+  adding/moving files under src/app/, restart Metro with npx expo start --clear before trusting anything route-related.
+
+  Also note: while dev-client cold-starts land on the launcher before following a link, a production build won't — that's dev-only behavior. Test it end-to-end from your phone
+  whenever you like (share from the phone, open on the emulator or vice versa), and say the word to commit.
+  
