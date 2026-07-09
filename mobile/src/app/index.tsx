@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, TextInput } from "react-native";
 
+import AppHeader from "@/components/app-header";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
@@ -82,103 +83,106 @@ export default function PartiesScreen() {
   ];
 
   return (
-    <FlatList
-      style={[styles.list, { backgroundColor: theme.background }]}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.content}
-      data={parties}
-      keyExtractor={(item) => item.partyId}
-      refreshing={loadingParties}
-      onRefresh={() => dispatch(fetchParties())}
-      ListHeaderComponent={
-        <ThemedView style={styles.header}>
-          <ThemedText type="title">Parties</ThemedText>
+    <ThemedView style={styles.screen}>
+      <AppHeader />
+      <FlatList
+        style={[styles.list, { backgroundColor: theme.background }]}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
+        data={parties}
+        keyExtractor={(item) => item.partyId}
+        refreshing={loadingParties}
+        onRefresh={() => dispatch(fetchParties())}
+        ListHeaderComponent={
+          <ThemedView style={styles.header}>
+            <ThemedText type="title">Parties</ThemedText>
 
-          <ThemedView style={styles.actionRow}>
-            <ActionButton
-              label="Create Party"
-              active={formMode === "create"}
-              onPress={() =>
-                setFormMode(formMode === "create" ? "none" : "create")
-              }
-            />
-            <ActionButton
-              label="Join Party"
-              active={formMode === "join"}
-              onPress={() => setFormMode(formMode === "join" ? "none" : "join")}
-            />
+            <ThemedView style={styles.actionRow}>
+              <ActionButton
+                label="Create Party"
+                active={formMode === "create"}
+                onPress={() =>
+                  setFormMode(formMode === "create" ? "none" : "create")
+                }
+              />
+              <ActionButton
+                label="Join Party"
+                active={formMode === "join"}
+                onPress={() => setFormMode(formMode === "join" ? "none" : "join")}
+              />
+            </ThemedView>
+
+            {formMode === "create" && (
+              <ThemedView style={styles.form}>
+                <TextInput
+                  value={partyName}
+                  onChangeText={setPartyName}
+                  placeholder="Party name"
+                  placeholderTextColor={theme.textSecondary}
+                  autoFocus
+                  style={inputStyle}
+                  onSubmitEditing={submitCreate}
+                />
+                <SubmitButton
+                  label={creating ? "Creating…" : "Create"}
+                  disabled={creating}
+                  onPress={submitCreate}
+                />
+                {createError && <ErrorText message={createError} />}
+              </ThemedView>
+            )}
+
+            {formMode === "join" && (
+              <ThemedView style={styles.form}>
+                <TextInput
+                  value={partyIdInput}
+                  onChangeText={setPartyIdInput}
+                  placeholder="Enter party id"
+                  placeholderTextColor={theme.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                  style={inputStyle}
+                  onSubmitEditing={submitJoin}
+                />
+                <SubmitButton
+                  label={joining ? "Joining…" : "Join"}
+                  disabled={joining}
+                  onPress={submitJoin}
+                />
+                {joinError && <ErrorText message={joinError} />}
+              </ThemedView>
+            )}
+
+            {partiesError && <ErrorText message={partiesError} />}
           </ThemedView>
-
-          {formMode === "create" && (
-            <ThemedView style={styles.form}>
-              <TextInput
-                value={partyName}
-                onChangeText={setPartyName}
-                placeholder="Party name"
-                placeholderTextColor={theme.textSecondary}
-                autoFocus
-                style={inputStyle}
-                onSubmitEditing={submitCreate}
-              />
-              <SubmitButton
-                label={creating ? "Creating…" : "Create"}
-                disabled={creating}
-                onPress={submitCreate}
-              />
-              {createError && <ErrorText message={createError} />}
-            </ThemedView>
-          )}
-
-          {formMode === "join" && (
-            <ThemedView style={styles.form}>
-              <TextInput
-                value={partyIdInput}
-                onChangeText={setPartyIdInput}
-                placeholder="Enter party id"
-                placeholderTextColor={theme.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-                style={inputStyle}
-                onSubmitEditing={submitJoin}
-              />
-              <SubmitButton
-                label={joining ? "Joining…" : "Join"}
-                disabled={joining}
-                onPress={submitJoin}
-              />
-              {joinError && <ErrorText message={joinError} />}
-            </ThemedView>
-          )}
-
-          {partiesError && <ErrorText message={partiesError} />}
-        </ThemedView>
-      }
-      renderItem={({ item }) => (
-        <Pressable
-          onPress={() => openExisting(item.partyId)}
-          style={({ pressed }) => pressed && styles.pressed}
-        >
-          <ThemedView type="backgroundElement" style={styles.partyRow}>
-            <ThemedText style={styles.partyName} numberOfLines={1}>
-              {item.name}
-            </ThemedText>
-            <ThemedView type="backgroundSelected" style={styles.roleBadge}>
-              <ThemedText type="small" themeColor="textSecondary">
-                {item.role === "organizer" ? "Organizer" : "Guest"}
+        }
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={() => openExisting(item.partyId)}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <ThemedView type="backgroundElement" style={styles.partyRow}>
+              <ThemedText style={styles.partyName} numberOfLines={1}>
+                {item.name}
               </ThemedText>
+              <ThemedView type="backgroundSelected" style={styles.roleBadge}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {item.role === "organizer" ? "Organizer" : "Guest"}
+                </ThemedText>
+              </ThemedView>
             </ThemedView>
-          </ThemedView>
-        </Pressable>
-      )}
-      ListEmptyComponent={
-        loadingParties ? null : (
-          <ThemedText themeColor="textSecondary" style={styles.empty}>
-            No parties yet. Create one or join with a party id.
-          </ThemedText>
-        )
-      }
-    />
+          </Pressable>
+        )}
+        ListEmptyComponent={
+          loadingParties ? null : (
+            <ThemedText themeColor="textSecondary" style={styles.empty}>
+              No parties yet. Create one or join with a party id.
+            </ThemedText>
+          )
+        }
+      />
+    </ThemedView>
   );
 }
 
@@ -238,6 +242,9 @@ function ErrorText({ message }: { message: string }) {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   list: {
     flex: 1,
   },

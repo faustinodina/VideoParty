@@ -1,5 +1,6 @@
 import { FlatList, Pressable, StyleSheet } from 'react-native';
 
+import AppHeader from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -16,71 +17,80 @@ export default function PartyScreen() {
 
   if (!activeParty) {
     return (
-      <ThemedView style={styles.placeholder}>
-        <ThemedText themeColor="textSecondary" style={styles.empty}>
-          Open a party from the Parties tab to see it here.
-        </ThemedText>
+      <ThemedView style={styles.screen}>
+        <AppHeader />
+        <ThemedView style={styles.placeholder}>
+          <ThemedText themeColor="textSecondary" style={styles.empty}>
+            Open a party from the Parties tab to see it here.
+          </ThemedText>
+        </ThemedView>
       </ThemedView>
     );
   }
 
   return (
-    <FlatList
-      style={[styles.list, { backgroundColor: theme.background }]}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.content}
-      data={members}
-      keyExtractor={(item) => item.partyMemberId}
-      ListHeaderComponent={
-        <ThemedView style={styles.header}>
-          <ThemedText type="title">{activeParty.name}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            You are {activeParty.role === 'organizer' ? 'the organizer' : 'a guest'} of
-            this party. Share the id below so others can join.
-          </ThemedText>
-          <ThemedView type="backgroundElement" style={styles.idBox}>
-            <ThemedText type="code" selectable>
-              {activeParty.partyId}
+    <ThemedView style={styles.screen}>
+      <AppHeader />
+      <FlatList
+        style={[styles.list, { backgroundColor: theme.background }]}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
+        data={members}
+        keyExtractor={(item) => item.partyMemberId}
+        ListHeaderComponent={
+          <ThemedView style={styles.header}>
+            <ThemedText type="title">{activeParty.name}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              You are {activeParty.role === 'organizer' ? 'the organizer' : 'a guest'} of
+              this party. Share the id below so others can join.
             </ThemedText>
-          </ThemedView>
-          <ThemedText type="subtitle">Members</ThemedText>
-        </ThemedView>
-      }
-      renderItem={({ item }) => (
-        <ThemedView type="backgroundElement" style={styles.memberRow}>
-          <ThemedText selectable style={styles.memberName}>
-            {item.displayName}
-          </ThemedText>
-          {item.userId === activeParty.organizerUserId && (
-            <ThemedView type="backgroundSelected" style={styles.organizerBadge}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Organizer
+            <ThemedView type="backgroundElement" style={styles.idBox}>
+              <ThemedText type="code" selectable>
+                {activeParty.partyId}
               </ThemedText>
             </ThemedView>
-          )}
-          {activeParty.role === 'organizer' &&
-            item.userId !== activeParty.organizerUserId && (
-              <Pressable
-                onPress={() => dispatch(removeMember(item))}
-                hitSlop={Spacing.two}
-              >
-                <ThemedText type="small" themeColor="danger">
-                  Remove
+            <ThemedText type="subtitle">Members</ThemedText>
+          </ThemedView>
+        }
+        renderItem={({ item }) => (
+          <ThemedView type="backgroundElement" style={styles.memberRow}>
+            <ThemedText selectable style={styles.memberName}>
+              {item.displayName}
+            </ThemedText>
+            {item.userId === activeParty.organizerUserId && (
+              <ThemedView type="backgroundSelected" style={styles.organizerBadge}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Organizer
                 </ThemedText>
-              </Pressable>
+              </ThemedView>
             )}
-        </ThemedView>
-      )}
-      ListEmptyComponent={
-        <ThemedText themeColor="textSecondary" style={styles.empty}>
-          No members yet. New joins will appear here in real time.
-        </ThemedText>
-      }
-    />
+            {activeParty.role === 'organizer' &&
+              item.userId !== activeParty.organizerUserId && (
+                <Pressable
+                  onPress={() => dispatch(removeMember(item))}
+                  hitSlop={Spacing.two}
+                >
+                  <ThemedText type="small" themeColor="danger">
+                    Remove
+                  </ThemedText>
+                </Pressable>
+              )}
+          </ThemedView>
+        )}
+        ListEmptyComponent={
+          <ThemedText themeColor="textSecondary" style={styles.empty}>
+            No members yet. New joins will appear here in real time.
+          </ThemedText>
+        }
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   list: {
     flex: 1,
   },
