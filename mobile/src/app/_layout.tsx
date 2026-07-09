@@ -1,10 +1,14 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
+import {
+  DarkTheme,
+  DefaultTheme,
+  Stack,
+  ThemeProvider,
+} from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Platform, useColorScheme } from "react-native";
 import { Provider } from "react-redux";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
-import AppTabs from "@/components/app-tabs";
 import RegisterScreen from "@/components/register-screen";
 import signalR from "@/services/signalRService";
 import { getUserId, isRegistered, onIdentityReset } from "@/services/userIdentity";
@@ -16,7 +20,7 @@ import {
   removedFromParty,
 } from "@/store/partySlice";
 
-export default function TabLayout() {
+export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   // null while the stored credentials are being read; false shows the
@@ -85,7 +89,7 @@ export default function TabLayout() {
         {registered === false && (
           <RegisterScreen onRegistered={() => setRegistered(true)} />
         )}
-        {registered && <AppTabs />}
+        {registered && <Stack screenOptions={{ headerShown: false }} />}
       </ThemeProvider>
     </Provider>
   );

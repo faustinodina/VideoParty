@@ -23,8 +23,9 @@ export default function PartyScreen() {
   const shareParty = async () => {
     if (!activeParty) return;
     const message =
-      `Join my party "${activeParty.name}" on VideoParty! ` +
-      `Party id: ${activeParty.partyId}`;
+      `Join my party "${activeParty.name}" on VideoParty!\n` +
+      `Tap to join: videoparty://join/${activeParty.partyId}\n` +
+      `Or paste this id into Join Party: ${activeParty.partyId}`;
 
     try {
       if (Platform.OS === 'web') {
