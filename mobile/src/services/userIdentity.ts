@@ -86,20 +86,26 @@ export function getUserName(): Promise<string> {
 
 /** Bearer token for API and SignalR calls; re-fetched near expiry. */
 export async function getAccessToken(): Promise<string> {
-  const cached = await settledToken();
+  // No await between reading and assigning tokenPromise: a concurrent caller
+  // must find this caller's in-flight fetch, not start a second one — two
+  // fetches that both hit the 401 path would register two identities.
+  let current = tokenPromise;
+  if (!current) {
+    current = tokenPromise = fetchToken();
+    return awaitToken(current);
+  }
+
+  const cached = await current.catch(() => null);
   // 60s of slack so a token can't expire mid-request.
   if (cached && Date.now() < cached.expiresAt - 60_000) {
     return cached.token;
   }
 
-  tokenPromise = fetchToken();
-  try {
-    return (await tokenPromise).token;
-  } catch (error) {
-    // Not cached: a failed fetch (e.g. API offline) retries on the next call.
-    tokenPromise = null;
-    throw error;
+  // Stale or failed; refresh unless a concurrent caller already has.
+  if (tokenPromise === current || !tokenPromise) {
+    tokenPromise = fetchToken();
   }
+  return awaitToken(tokenPromise);
 }
 
 /** Drops the cached token, e.g. after a 401 from the API. */
@@ -107,14 +113,16 @@ export function invalidateAccessToken() {
   tokenPromise = null;
 }
 
-async function settledToken(): Promise<AccessToken | null> {
-  if (!tokenPromise) {
-    return null;
-  }
+async function awaitToken(promise: Promise<AccessToken>): Promise<string> {
   try {
-    return await tokenPromise;
-  } catch {
-    return null;
+    return (await promise).token;
+  } catch (error) {
+    // Not cached: a failed fetch (e.g. API offline) retries on the next
+    // call, unless a newer fetch already replaced this one.
+    if (tokenPromise === promise) {
+      tokenPromise = null;
+    }
+    throw error;
   }
 }
 
