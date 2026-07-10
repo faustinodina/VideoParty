@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -51,6 +52,19 @@ builder.Services
             context.Token = accessToken;
           }
           return Task.CompletedTask;
+        },
+        // A JWT stays valid after its user is deleted (e.g. a dev database
+        // wipe), so a signature check alone lets ghost users through.
+        OnTokenValidated = async context =>
+        {
+          var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+          var db = context.HttpContext.RequestServices
+              .GetRequiredService<ApplicationDbContext>();
+          if (!Guid.TryParse(userId, out var id) ||
+              !await db.Users.AnyAsync(u => u.UserId == id))
+          {
+            context.Fail("Token references a user that no longer exists.");
+          }
         }
       };
     });
