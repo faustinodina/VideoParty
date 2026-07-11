@@ -1,9 +1,14 @@
 import {
   DarkTheme,
   DefaultTheme,
+  router,
   Stack,
   ThemeProvider,
 } from "expo-router";
+import {
+  ShareIntentProvider,
+  useShareIntentContext,
+} from "expo-share-intent";
 import { useEffect, useState } from "react";
 import { Alert, Platform, useColorScheme } from "react-native";
 import { Provider } from "react-redux";
@@ -18,7 +23,30 @@ import {
   memberJoined,
   memberRemoved,
   removedFromParty,
+  videoShared,
 } from "@/store/partySlice";
+
+// Receives Android share-sheet intents (e.g. Share → VideoParty from
+// YouTube): stores the link and lands on the Party tab. Rendered inside
+// ShareIntentProvider and alongside the Stack so navigation is available.
+function ShareIntentHandler() {
+  const { hasShareIntent, shareIntent, resetShareIntent } =
+    useShareIntentContext();
+
+  useEffect(() => {
+    if (!hasShareIntent) return;
+    // YouTube shares arrive as text; webUrl is the extracted link when the
+    // text contains one.
+    const url = shareIntent.webUrl ?? shareIntent.text;
+    if (url) {
+      store.dispatch(videoShared(url));
+      router.navigate("/party");
+    }
+    resetShareIntent();
+  }, [hasShareIntent, shareIntent, resetShareIntent]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -83,14 +111,21 @@ export default function RootLayout() {
   }, [registered]);
 
   return (
-    <Provider store={store}>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <AnimatedSplashOverlay />
-        {registered === false && (
-          <RegisterScreen onRegistered={() => setRegistered(true)} />
-        )}
-        {registered && <Stack screenOptions={{ headerShown: false }} />}
-      </ThemeProvider>
-    </Provider>
+    <ShareIntentProvider>
+      <Provider store={store}>
+        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+          <AnimatedSplashOverlay />
+          {registered === false && (
+            <RegisterScreen onRegistered={() => setRegistered(true)} />
+          )}
+          {registered && (
+            <>
+              <ShareIntentHandler />
+              <Stack screenOptions={{ headerShown: false }} />
+            </>
+          )}
+        </ThemeProvider>
+      </Provider>
+    </ShareIntentProvider>
   );
 }

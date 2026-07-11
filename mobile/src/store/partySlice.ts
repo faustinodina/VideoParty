@@ -27,6 +27,8 @@ interface PartyState {
   activePartyId: string | null;
   /** Members of the active party (fetched snapshot + live joins). */
   members: PartyMember[];
+  /** Video link received via the Android share sheet, awaiting handling. */
+  pendingVideoUrl: string | null;
 }
 
 const initialState: PartyState = {
@@ -39,6 +41,7 @@ const initialState: PartyState = {
   joinError: null,
   activePartyId: null,
   members: [],
+  pendingVideoUrl: null,
 };
 
 
@@ -149,6 +152,14 @@ const partySlice = createSlice({
         );
       }
     },
+    // A video link arrived through the share sheet (see ShareIntentHandler
+    // in _layout). Held here until the party features can consume it.
+    videoShared(state, action: PayloadAction<string>) {
+      state.pendingVideoUrl = action.payload;
+    },
+    clearPendingVideo(state) {
+      state.pendingVideoUrl = null;
+    },
     // This device's user was removed by the organizer: drop the party from
     // the list and close it if it is the one currently open.
     removedFromParty(state, action: PayloadAction<PartyMember>) {
@@ -232,6 +243,11 @@ export const selectActiveParty = (state: RootState) =>
   state.party.parties.find((p) => p.partyId === state.party.activePartyId) ??
   null;
 
-export const { memberJoined, memberRemoved, removedFromParty } =
-  partySlice.actions;
+export const {
+  clearPendingVideo,
+  memberJoined,
+  memberRemoved,
+  removedFromParty,
+  videoShared,
+} = partySlice.actions;
 export default partySlice.reducer;

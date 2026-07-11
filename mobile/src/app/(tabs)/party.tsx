@@ -17,7 +17,12 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { leaveParty, removeMember, selectActiveParty } from '@/store/partySlice';
+import {
+  clearPendingVideo,
+  leaveParty,
+  removeMember,
+  selectActiveParty,
+} from '@/store/partySlice';
 
 export default function PartyScreen() {
   const theme = useTheme();
@@ -26,6 +31,9 @@ export default function PartyScreen() {
 
   const activeParty = useAppSelector(selectActiveParty);
   const members = useAppSelector((state) => state.party.members);
+  const pendingVideoUrl = useAppSelector(
+    (state) => state.party.pendingVideoUrl
+  );
 
   // Web-only fallback feedback: set when the invitation was copied to the
   // clipboard because the browser has no share dialog.
@@ -112,6 +120,15 @@ export default function PartyScreen() {
           <ThemedText themeColor="textSecondary" style={styles.empty}>
             Open a party from the Parties tab to see it here.
           </ThemedText>
+          {pendingVideoUrl && (
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={styles.empty}
+            >
+              A video link is waiting: open a party to add it.
+            </ThemedText>
+          )}
         </ThemedView>
       </ThemedView>
     );
@@ -173,6 +190,21 @@ export default function PartyScreen() {
                 </ThemedText>
               </Pressable>
             </ThemedView>
+            {pendingVideoUrl && (
+              <ThemedView type="backgroundElement" style={styles.pendingVideo}>
+                <ThemedText type="small" style={styles.pendingVideoUrl}>
+                  Video to add: {pendingVideoUrl}
+                </ThemedText>
+                <Pressable
+                  onPress={() => dispatch(clearPendingVideo())}
+                  hitSlop={Spacing.two}
+                >
+                  <ThemedText type="small" themeColor="danger">
+                    Dismiss
+                  </ThemedText>
+                </Pressable>
+              </ThemedView>
+            )}
             {copiedInvite && (
               <ThemedText type="small" themeColor="textSecondary">
                 Invitation copied to the clipboard.
@@ -268,6 +300,18 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  pendingVideo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
+    borderCurve: 'continuous',
+  },
+  pendingVideoUrl: {
+    flex: 1,
   },
   memberRow: {
     flexDirection: 'row',
