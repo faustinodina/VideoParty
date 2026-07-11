@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { FlatList, Linking, Pressable, StyleSheet } from 'react-native';
 
 import AppHeader from '@/components/app-header';
@@ -135,12 +136,21 @@ export default function VideosScreen() {
             style={({ pressed }) => pressed && styles.pressed}
           >
             <ThemedView type="backgroundElement" style={styles.videoRow}>
-              <ThemedText type="small" selectable>
-                {item.url}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                added by {addedBy(item.addedByUserId)}
-              </ThemedText>
+              {item.thumbnailUrl && (
+                <Image
+                  source={{ uri: item.thumbnailUrl }}
+                  style={styles.thumbnail}
+                  contentFit="cover"
+                />
+              )}
+              <ThemedView style={styles.videoInfo}>
+                <ThemedText type="smallBold" numberOfLines={2}>
+                  {item.title ?? item.url}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  added by {addedBy(item.addedByUserId)}
+                </ThemedText>
+              </ThemedView>
             </ThemedView>
           </Pressable>
         )}
@@ -212,11 +222,26 @@ const styles = StyleSheet.create({
     color: '#208AEF',
   },
   videoRow: {
-    gap: Spacing.half,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     borderRadius: Spacing.two,
     borderCurve: 'continuous',
+  },
+  thumbnail: {
+    // 16:9, like the YouTube thumbnails it shows.
+    width: 96,
+    height: 54,
+    borderRadius: Spacing.one,
+    // Behind the image while it loads and for letterboxed sources.
+    backgroundColor: '#00000020',
+  },
+  videoInfo: {
+    flex: 1,
+    gap: Spacing.half,
+    backgroundColor: 'transparent',
   },
   empty: {
     textAlign: 'center',

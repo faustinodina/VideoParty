@@ -45,6 +45,9 @@ export interface PartyVideo {
   partyId: string;
   addedByUserId: string;
   url: string;
+  /** From the provider's oEmbed data; null when it could not be fetched. */
+  title: string | null;
+  thumbnailUrl: string | null;
   /** Playlist order; lower plays first, gaps allowed. */
   position: number;
   /** ISO 8601 UTC, stamped by the API. */

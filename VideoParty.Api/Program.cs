@@ -25,6 +25,12 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddSignalR();
 
+// Used by VPController to fetch video titles/thumbnails from oEmbed
+// endpoints. The short timeout keeps a slow provider from stalling AddVideo;
+// on expiry the video is simply saved without metadata.
+builder.Services.AddHttpClient("oembed", client =>
+    client.Timeout = TimeSpan.FromSeconds(5));
+
 // Bearer JWTs issued by AuthController (see its comment for the device-token
 // scheme). The same token authenticates REST calls and the SignalR hub.
 builder.Services

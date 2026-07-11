@@ -21,6 +21,11 @@ namespace VideoParty.Model.Models
     // share sheet).
     public required string Url { get; set; }
 
+    // Display metadata fetched from the provider's oEmbed endpoint when the
+    // video was added; null when the fetch failed (clients fall back to Url).
+    public string? Title { get; set; }
+    public string? ThumbnailUrl { get; set; }
+
     // Order of the video within the party's playlist; lower plays first.
     // Gaps are fine, only the relative order matters.
     public required int Position { get; set; }

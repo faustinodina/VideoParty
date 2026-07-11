@@ -17,11 +17,16 @@ namespace VideoParty.Api.Controllers
   {
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<UserHub> _hub;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public VPController(ApplicationDbContext db, IHubContext<UserHub> hub)
+    public VPController(
+        ApplicationDbContext db,
+        IHubContext<UserHub> hub,
+        IHttpClientFactory httpClientFactory)
     {
       _db = db;
       _hub = hub;
+      _httpClientFactory = httpClientFactory;
     }
 
     // The authenticated caller, from the JWT's `sub` claim (see AuthController).
@@ -329,6 +334,25 @@ namespace VideoParty.Api.Controllers
       return video;
     }
 
+    // What other apps show as a link preview: title and thumbnail from the
+    // provider's oEmbed endpoint (YouTube serves it without an API key).
+    // Best effort: any failure — non-YouTube link, provider down, timeout —
+    // just means no metadata, never a failed AddVideo.
+    private async Task<(string? Title, string? ThumbnailUrl)> FetchVideoMetadata(string url)
+    {
+      try
+      {
+        var client = _httpClientFactory.CreateClient("oembed");
+        var oembed = await client.GetFromJsonAsync<OEmbedResponse>(
+            $"https://www.youtube.com/oembed?url={Uri.EscapeDataString(url)}&format=json");
+        return (oembed?.Title, oembed?.ThumbnailUrl);
+      }
+      catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+      {
+        return (null, null);
+      }
+    }
+
     // Any member of the party can add a video; it is appended at the end of
     // the playlist.
     [HttpPost("parties/{partyId:guid}/videos")]
@@ -354,6 +378,8 @@ namespace VideoParty.Api.Controllers
         return BadRequest("The video link is not a valid URL.");
       }
 
+      var (title, thumbnailUrl) = await FetchVideoMetadata(request.Url);
+
       // Append: one past the current highest position. Two concurrent adds
       // can tie; ties are harmless (Position only orders, gaps allowed).
       var maxPosition = await _db.PartyVideos
@@ -366,6 +392,8 @@ namespace VideoParty.Api.Controllers
         PartyId = partyId,
         AddedByUserId = userId,
         Url = request.Url,
+        Title = title,
+        ThumbnailUrl = thumbnailUrl,
         Position = maxPosition + 1
       };
 
@@ -380,6 +408,8 @@ namespace VideoParty.Api.Controllers
         video.PartyId,
         video.AddedByUserId,
         video.Url,
+        video.Title,
+        video.ThumbnailUrl,
         video.Position,
         video.CreatedAt,
         video.UpdatedAt
@@ -441,6 +471,12 @@ namespace VideoParty.Api.Controllers
   public record RegisterMemberRequest(string DisplayName);
 
   public record AddVideoRequest(string Url);
+
+  // The subset of the oEmbed response (https://oembed.com) VideoParty uses.
+  public record OEmbedResponse(
+      string? Title,
+      [property: System.Text.Json.Serialization.JsonPropertyName("thumbnail_url")]
+      string? ThumbnailUrl);
 
   public enum PartyRole
   {
