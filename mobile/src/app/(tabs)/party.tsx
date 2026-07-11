@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Platform, Pressable, Share, StyleSheet } from 'react-native';
 
@@ -8,10 +9,11 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { removeMember, selectActiveParty } from '@/store/partySlice';
+import { leaveParty, removeMember, selectActiveParty } from '@/store/partySlice';
 
 export default function PartyScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const dispatch = useAppDispatch();
 
   const activeParty = useAppSelector(selectActiveParty);
@@ -57,6 +59,18 @@ export default function PartyScreen() {
     }
   };
 
+  const exitParty = async () => {
+    if (!activeParty) return;
+    try {
+      await dispatch(leaveParty(activeParty.partyId)).unwrap();
+      // The active party is gone; land back on the list.
+      router.navigate('/');
+    } catch {
+      // Consistent with removeMember: a failed leave just leaves the party
+      // open.
+    }
+  };
+
   if (!activeParty) {
     return (
       <ThemedView style={styles.screen}>
@@ -88,7 +102,7 @@ export default function PartyScreen() {
               {activeParty.role === 'organizer' &&
                 ' Each Share Party invite admits one guest.'}
             </ThemedText>
-            {activeParty.role === 'organizer' && (
+            {activeParty.role === 'organizer' ? (
               <Pressable
                 onPress={shareParty}
                 style={({ pressed }) => [
@@ -98,6 +112,18 @@ export default function PartyScreen() {
               >
                 <ThemedText type="smallBold" style={styles.shareButtonLabel}>
                   Share Party
+                </ThemedText>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={exitParty}
+                style={({ pressed }) => [
+                  styles.leaveButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <ThemedText type="smallBold" style={styles.shareButtonLabel}>
+                  Leave Party
                 </ThemedText>
               </Pressable>
             )}
@@ -182,6 +208,13 @@ const styles = StyleSheet.create({
   },
   shareButtonLabel: {
     color: '#ffffff',
+  },
+  leaveButton: {
+    backgroundColor: '#d93025',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.three,
+    alignSelf: 'flex-start',
   },
   pressed: {
     opacity: 0.7,

@@ -138,3 +138,8 @@ export function removeMember(
 ): Promise<void> {
   return del(`/VP/parties/${partyId}/members/${partyMemberId}`);
 }
+
+// The caller removes themself from the party. Rejected for the organizer.
+export function leaveParty(partyId: string): Promise<void> {
+  return del(`/VP/parties/${partyId}/members/me`);
+}

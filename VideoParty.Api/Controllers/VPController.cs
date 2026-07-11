@@ -255,6 +255,49 @@ namespace VideoParty.Api.Controllers
       return CreatedAtAction(nameof(GetMember), new { partyId = partyId, id = member.PartyMemberId }, member);
     }
 
+    // A guest abandons the party on their own. Mirrors RemoveMember's
+    // broadcast so every client, including the leaver's, reacts the same way
+    // as to an organizer removal.
+    [HttpDelete("parties/{partyId:guid}/members/me")]
+    public async Task<IActionResult> LeaveParty(Guid partyId)
+    {
+      var party = await _db.Parties.FindAsync(partyId);
+      if (party is null)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      var userId = CallerUserId;
+
+      // The organizer's member row anchors the party (see RemoveMember).
+      if (party.OrganizerUserId == userId)
+      {
+        return BadRequest("The organizer cannot abandon their own party.");
+      }
+
+      var member = await _db.PartyMembers
+          .FirstOrDefaultAsync(m => m.PartyId == partyId && m.UserId == userId);
+      if (member is null)
+      {
+        return NotFound($"You are not a member of party '{partyId}'.");
+      }
+
+      _db.PartyMembers.Remove(member);
+      await _db.SaveChangesAsync();
+
+      await _hub.Clients.Group(partyId.ToString()).SendAsync("MemberRemoved", new
+      {
+        member.PartyMemberId,
+        member.PartyId,
+        member.UserId,
+        member.DisplayName,
+        member.CreatedAt,
+        member.UpdatedAt
+      });
+
+      return NoContent();
+    }
+
     // Only the party's organizer may remove members.
     [HttpDelete("parties/{partyId:guid}/members/{id:guid}")]
     public async Task<IActionResult> RemoveMember(Guid partyId, Guid id)

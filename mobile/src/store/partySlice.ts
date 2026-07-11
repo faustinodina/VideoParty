@@ -4,6 +4,7 @@ import {
   createParty as createPartyApi,
   getMembers,
   getUserParties,
+  leaveParty as leavePartyApi,
   PartyMember,
   PartySummary,
   registerMember,
@@ -89,6 +90,18 @@ export const removeMember = createAsyncThunk(
   async (member: PartyMember) => {
     await removeMemberApi(member.partyId, member.partyMemberId);
     return member;
+  }
+);
+
+// A guest abandons a party. The API broadcasts MemberRemoved (echoed back
+// to this device too, harmlessly), but the fulfilled reducer cleans up
+// locally so leaving works even if that echo is missed.
+export const leaveParty = createAsyncThunk(
+  "party/leave",
+  async (partyId: string) => {
+    await leavePartyApi(partyId);
+    await signalR.leaveParty(partyId);
+    return partyId;
   }
 );
 
@@ -194,6 +207,18 @@ const partySlice = createSlice({
         state.members = state.members.filter(
           (m) => m.partyMemberId !== action.payload.partyMemberId
         );
+      })
+      .addCase(leaveParty.fulfilled, (state, action) => {
+        // Same cleanup as removedFromParty: drop the party and close it if
+        // it is the one currently open.
+        const partyId = action.payload.toLowerCase();
+        state.parties = state.parties.filter(
+          (p) => p.partyId.toLowerCase() !== partyId
+        );
+        if (state.activePartyId?.toLowerCase() === partyId) {
+          state.activePartyId = null;
+          state.members = [];
+        }
       })
       .addCase(openParty.fulfilled, (state, action) => {
         // Always replace: re-opening the same party refreshes its members.

@@ -16,6 +16,7 @@ import {
   createParty,
   fetchParties,
   joinParty,
+  leaveParty,
   openParty,
 } from "@/store/partySlice";
 
@@ -187,6 +188,16 @@ export default function PartiesScreen() {
                   {item.role === "organizer" ? "Organizer" : "Guest"}
                 </ThemedText>
               </ThemedView>
+              {item.role === "guest" && (
+                <Pressable
+                  onPress={() => dispatch(leaveParty(item.partyId))}
+                  hitSlop={Spacing.two}
+                >
+                  <ThemedText type="small" themeColor="danger">
+                    Leave
+                  </ThemedText>
+                </Pressable>
+              )}
             </ThemedView>
           </Pressable>
         )}
