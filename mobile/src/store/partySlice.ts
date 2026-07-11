@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 import {
+  addVideo as addVideoApi,
   createParty as createPartyApi,
   getMembers,
   getUserParties,
@@ -29,6 +30,15 @@ interface PartyState {
   members: PartyMember[];
   /** Video link received via the Android share sheet, awaiting handling. */
   pendingVideoUrl: string | null;
+  /**
+   * Party whose Add Video button launched YouTube. The share sheet gives
+   * the returning link no context of its own, so this is what binds it to
+   * a party; a spontaneous share (not via Add Video) has none and falls
+   * back to the active party.
+   */
+  videoTargetPartyId: string | null;
+  addingVideo: boolean;
+  addVideoError: string | null;
 }
 
 const initialState: PartyState = {
@@ -42,6 +52,9 @@ const initialState: PartyState = {
   activePartyId: null,
   members: [],
   pendingVideoUrl: null,
+  videoTargetPartyId: null,
+  addingVideo: false,
+  addVideoError: null,
 };
 
 
@@ -108,6 +121,38 @@ export const leaveParty = createAsyncThunk(
   }
 );
 
+// Picks the party a shared link should be posted to: the one that launched
+// Add Video when known, the open party otherwise.
+const videoTargetParty = (state: RootState) =>
+  state.party.videoTargetPartyId ?? state.party.activePartyId;
+
+// Posts the share-sheet link to its target party's playlist. Dispatched
+// automatically when the link arrives (see ShareIntentHandler in _layout)
+// and by the pending banner's Add action. The pending link is cleared only
+// on success (see the fulfilled reducer) so a failed post stays in the
+// banner and can be retried.
+export const addPendingVideo = createAsyncThunk(
+  "party/addPendingVideo",
+  async (_: void, { getState }) => {
+    const state = getState() as RootState;
+    const partyId = videoTargetParty(state);
+    const { pendingVideoUrl } = state.party;
+    if (!partyId || !pendingVideoUrl) {
+      throw new Error("No pending video or no open party.");
+    }
+    return addVideoApi(partyId, pendingVideoUrl);
+  },
+  {
+    // The automatic dispatch must not raise an error when there is simply
+    // nothing to do yet: without a target party the link stays pending and
+    // the banner keeps offering the manual Add.
+    condition: (_, { getState }) => {
+      const state = getState() as RootState;
+      return Boolean(state.party.pendingVideoUrl && videoTargetParty(state));
+    },
+  }
+);
+
 // Opens a party the user already belongs to (tapping a row in the list).
 export const openParty = createAsyncThunk(
   "party/open",
@@ -152,13 +197,22 @@ const partySlice = createSlice({
         );
       }
     },
+    // Add Video is about to open YouTube for this party: remember it so the
+    // link that comes back through the share sheet is posted to it, whatever
+    // party happens to be open by then.
+    videoRequested(state, action: PayloadAction<string>) {
+      state.videoTargetPartyId = action.payload;
+    },
     // A video link arrived through the share sheet (see ShareIntentHandler
-    // in _layout). Held here until the party features can consume it.
+    // in _layout, which follows this dispatch with addPendingVideo).
     videoShared(state, action: PayloadAction<string>) {
       state.pendingVideoUrl = action.payload;
+      state.addVideoError = null;
     },
     clearPendingVideo(state) {
       state.pendingVideoUrl = null;
+      state.videoTargetPartyId = null;
+      state.addVideoError = null;
     },
     // This device's user was removed by the organizer: drop the party from
     // the list and close it if it is the one currently open.
@@ -170,6 +224,10 @@ const partySlice = createSlice({
       if (state.activePartyId?.toLowerCase() === partyId) {
         state.activePartyId = null;
         state.members = [];
+      }
+      // A shared link can no longer target a party the user is not in.
+      if (state.videoTargetPartyId?.toLowerCase() === partyId) {
+        state.videoTargetPartyId = null;
       }
     },
   },
@@ -230,6 +288,22 @@ const partySlice = createSlice({
           state.activePartyId = null;
           state.members = [];
         }
+        if (state.videoTargetPartyId?.toLowerCase() === partyId) {
+          state.videoTargetPartyId = null;
+        }
+      })
+      .addCase(addPendingVideo.pending, (state) => {
+        state.addingVideo = true;
+        state.addVideoError = null;
+      })
+      .addCase(addPendingVideo.fulfilled, (state) => {
+        state.addingVideo = false;
+        state.pendingVideoUrl = null;
+        state.videoTargetPartyId = null;
+      })
+      .addCase(addPendingVideo.rejected, (state, action) => {
+        state.addingVideo = false;
+        state.addVideoError = action.error.message ?? "Something went wrong";
       })
       .addCase(openParty.fulfilled, (state, action) => {
         // Always replace: re-opening the same party refreshes its members.
@@ -248,6 +322,7 @@ export const {
   memberJoined,
   memberRemoved,
   removedFromParty,
+  videoRequested,
   videoShared,
 } = partySlice.actions;
 export default partySlice.reducer;

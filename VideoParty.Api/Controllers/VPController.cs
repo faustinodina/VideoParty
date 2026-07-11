@@ -298,6 +298,78 @@ namespace VideoParty.Api.Controllers
       return NoContent();
     }
 
+    [HttpGet("parties/{partyId:guid}/videos/{id:guid}", Name = nameof(GetVideo))]
+    public async Task<ActionResult<PartyVideo>> GetVideo(Guid partyId, Guid id)
+    {
+      var video = await _db.PartyVideos
+          .FirstOrDefaultAsync(v => v.PartyId == partyId && v.PartyVideoId == id);
+      if (video is null)
+      {
+        return NotFound($"Video '{id}' was not found in party '{partyId}'.");
+      }
+
+      return video;
+    }
+
+    // Any member of the party can add a video; it is appended at the end of
+    // the playlist.
+    [HttpPost("parties/{partyId:guid}/videos")]
+    public async Task<ActionResult<PartyVideo>> AddVideo(Guid partyId, AddVideoRequest request)
+    {
+      var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
+      if (!partyExists)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      var userId = CallerUserId;
+      var isMember = await _db.PartyMembers
+          .AnyAsync(m => m.PartyId == partyId && m.UserId == userId);
+      if (!isMember)
+      {
+        return StatusCode(StatusCodes.Status403Forbidden,
+            "Only members of this party can add videos to it.");
+      }
+
+      if (!Uri.IsWellFormedUriString(request.Url, UriKind.Absolute))
+      {
+        return BadRequest("The video link is not a valid URL.");
+      }
+
+      // Append: one past the current highest position. Two concurrent adds
+      // can tie; ties are harmless (Position only orders, gaps allowed).
+      var maxPosition = await _db.PartyVideos
+          .Where(v => v.PartyId == partyId)
+          .MaxAsync(v => (int?)v.Position) ?? -1;
+
+      var video = new PartyVideo
+      {
+        PartyVideoId = Guid.NewGuid(),
+        PartyId = partyId,
+        AddedByUserId = userId,
+        Url = request.Url,
+        Position = maxPosition + 1
+      };
+
+      _db.PartyVideos.Add(video);
+      await _db.SaveChangesAsync();
+
+      // Same shape as the GetVideo/AddVideo responses so clients can mix
+      // fetched and live data, like the member events.
+      await _hub.Clients.Group(partyId.ToString()).SendAsync("VideoAdded", new
+      {
+        video.PartyVideoId,
+        video.PartyId,
+        video.AddedByUserId,
+        video.Url,
+        video.Position,
+        video.CreatedAt,
+        video.UpdatedAt
+      });
+
+      return CreatedAtAction(nameof(GetVideo), new { partyId = partyId, id = video.PartyVideoId }, video);
+    }
+
     // Only the party's organizer may remove members.
     [HttpDelete("parties/{partyId:guid}/members/{id:guid}")]
     public async Task<IActionResult> RemoveMember(Guid partyId, Guid id)
@@ -349,6 +421,8 @@ namespace VideoParty.Api.Controllers
   public record CreatePartyRequest(string Name, string OrganizerName);
 
   public record RegisterMemberRequest(string DisplayName);
+
+  public record AddVideoRequest(string Url);
 
   public enum PartyRole
   {

@@ -18,10 +18,12 @@ import { useTheme } from '@/hooks/use-theme';
 import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
+  addPendingVideo,
   clearPendingVideo,
   leaveParty,
   removeMember,
   selectActiveParty,
+  videoRequested,
 } from '@/store/partySlice';
 
 export default function PartyScreen() {
@@ -34,6 +36,8 @@ export default function PartyScreen() {
   const pendingVideoUrl = useAppSelector(
     (state) => state.party.pendingVideoUrl
   );
+  const addingVideo = useAppSelector((state) => state.party.addingVideo);
+  const addVideoError = useAppSelector((state) => state.party.addVideoError);
 
   // Web-only fallback feedback: set when the invitation was copied to the
   // clipboard because the browser has no share dialog.
@@ -79,6 +83,10 @@ export default function PartyScreen() {
   // (not canOpenURL) because Android package-visibility rules make
   // canOpenURL report false for apps the manifest does not declare.
   const addVideo = async () => {
+    if (!activeParty) return;
+    // The share sheet gives the returning link no context; remembering the
+    // party here is what lets ShareIntentHandler post it automatically.
+    dispatch(videoRequested(activeParty.partyId));
     try {
       await Linking.openURL('vnd.youtube://');
     } catch {
@@ -196,7 +204,17 @@ export default function PartyScreen() {
                   Video to add: {pendingVideoUrl}
                 </ThemedText>
                 <Pressable
+                  onPress={() => dispatch(addPendingVideo())}
+                  disabled={addingVideo}
+                  hitSlop={Spacing.two}
+                >
+                  <ThemedText type="smallBold" style={styles.addAction}>
+                    {addingVideo ? 'Adding…' : 'Add'}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
                   onPress={() => dispatch(clearPendingVideo())}
+                  disabled={addingVideo}
                   hitSlop={Spacing.two}
                 >
                   <ThemedText type="small" themeColor="danger">
@@ -204,6 +222,11 @@ export default function PartyScreen() {
                   </ThemedText>
                 </Pressable>
               </ThemedView>
+            )}
+            {addVideoError && (
+              <ThemedText type="small" themeColor="danger">
+                Could not add the video: {addVideoError}
+              </ThemedText>
             )}
             {copiedInvite && (
               <ThemedText type="small" themeColor="textSecondary">
@@ -312,6 +335,10 @@ const styles = StyleSheet.create({
   },
   pendingVideoUrl: {
     flex: 1,
+  },
+  addAction: {
+    // Same accent as the action buttons above.
+    color: '#208AEF',
   },
   memberRow: {
     flexDirection: 'row',

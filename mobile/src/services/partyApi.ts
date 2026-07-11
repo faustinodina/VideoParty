@@ -38,6 +38,20 @@ export interface PartyMember {
   updatedAt: string;
 }
 
+// Mirrors the PartyVideo entity; also the VideoAdded SignalR payload,
+// which the API broadcasts with the same shape.
+export interface PartyVideo {
+  partyVideoId: string;
+  partyId: string;
+  addedByUserId: string;
+  url: string;
+  /** Playlist order; lower plays first, gaps allowed. */
+  position: number;
+  /** ISO 8601 UTC, stamped by the API. */
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Mirrors PartyInvitation returned by POST /VP/parties/{partyId}/invitations.
 export interface PartyInvitation {
   partyId: string;
@@ -137,6 +151,11 @@ export function removeMember(
   partyMemberId: string
 ): Promise<void> {
   return del(`/VP/parties/${partyId}/members/${partyMemberId}`);
+}
+
+// Appends a video to the party's playlist. Any member of the party may add.
+export function addVideo(partyId: string, url: string): Promise<PartyVideo> {
+  return post<PartyVideo>(`/VP/parties/${partyId}/videos`, { url });
 }
 
 // The caller removes themself from the party. Rejected for the organizer.

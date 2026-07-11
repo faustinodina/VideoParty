@@ -19,6 +19,7 @@ import signalR from "@/services/signalRService";
 import { getUserId, isRegistered, onIdentityReset } from "@/services/userIdentity";
 import { store } from "@/store";
 import {
+  addPendingVideo,
   fetchParties,
   memberJoined,
   memberRemoved,
@@ -27,8 +28,9 @@ import {
 } from "@/store/partySlice";
 
 // Receives Android share-sheet intents (e.g. Share → VideoParty from
-// YouTube): stores the link and lands on the Party tab. Rendered inside
-// ShareIntentProvider and alongside the Stack so navigation is available.
+// YouTube): stores the link, posts it to its party, and lands on the Party
+// tab. Rendered inside ShareIntentProvider and alongside the Stack so
+// navigation is available.
 function ShareIntentHandler() {
   const { hasShareIntent, shareIntent, resetShareIntent } =
     useShareIntentContext();
@@ -40,6 +42,10 @@ function ShareIntentHandler() {
     const url = shareIntent.webUrl ?? shareIntent.text;
     if (url) {
       store.dispatch(videoShared(url));
+      // Automatic post to the party that launched Add Video (or the open
+      // party). Without one this is a no-op (see the thunk's condition):
+      // the link stays pending until a party can take it.
+      store.dispatch(addPendingVideo());
       router.navigate("/party");
     }
     resetShareIntent();
