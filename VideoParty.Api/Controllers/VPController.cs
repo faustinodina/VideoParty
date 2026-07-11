@@ -298,6 +298,24 @@ namespace VideoParty.Api.Controllers
       return NoContent();
     }
 
+    // The party's playlist in play order.
+    [HttpGet("parties/{partyId:guid}/videos")]
+    public async Task<ActionResult<IEnumerable<PartyVideo>>> GetVideos(Guid partyId)
+    {
+      var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
+      if (!partyExists)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      // CreatedAt breaks the ties concurrent adds can produce (see AddVideo).
+      return await _db.PartyVideos
+          .Where(v => v.PartyId == partyId)
+          .OrderBy(v => v.Position)
+          .ThenBy(v => v.CreatedAt)
+          .ToListAsync();
+    }
+
     [HttpGet("parties/{partyId:guid}/videos/{id:guid}", Name = nameof(GetVideo))]
     public async Task<ActionResult<PartyVideo>> GetVideo(Guid partyId, Guid id)
     {

@@ -5,7 +5,7 @@ import {
 } from "@microsoft/signalr";
 
 import { HUB_URL } from "@/constants/config";
-import type { PartyMember } from "@/services/partyApi";
+import type { PartyMember, PartyVideo } from "@/services/partyApi";
 import { getAccessToken } from "@/services/userIdentity";
 
 class SignalRService {
@@ -116,6 +116,13 @@ class SignalRService {
   onMemberRemoved(callback: (member: PartyMember) => void) {
     this.on("MemberRemoved", callback);
     return () => this.off("MemberRemoved", callback);
+  }
+
+  // Broadcast by the API when a member adds a video to the party's
+  // playlist; the payload has the same shape as the PartyVideo entity.
+  onVideoAdded(callback: (video: PartyVideo) => void) {
+    this.on("VideoAdded", callback);
+    return () => this.off("VideoAdded", callback);
   }
 
   async disconnect() {

@@ -5,9 +5,11 @@ import {
   createParty as createPartyApi,
   getMembers,
   getUserParties,
+  getVideos,
   leaveParty as leavePartyApi,
   PartyMember,
   PartySummary,
+  PartyVideo,
   registerMember,
   removeMember as removeMemberApi,
 } from "@/services/partyApi";
@@ -28,6 +30,8 @@ interface PartyState {
   activePartyId: string | null;
   /** Members of the active party (fetched snapshot + live joins). */
   members: PartyMember[];
+  /** Playlist of the active party (fetched snapshot + live adds), in play order. */
+  videos: PartyVideo[];
   /** Video link received via the Android share sheet, awaiting handling. */
   pendingVideoUrl: string | null;
   /**
@@ -51,12 +55,32 @@ const initialState: PartyState = {
   joinError: null,
   activePartyId: null,
   members: [],
+  videos: [],
   pendingVideoUrl: null,
   videoTargetPartyId: null,
   addingVideo: false,
   addVideoError: null,
 };
 
+
+// Inserts keeping play order (position, createdAt breaking ties, mirroring
+// the API's ordering). Skips videos already known from the fetched snapshot:
+// an add can arrive over SignalR right after it was included in getVideos.
+function insertVideo(videos: PartyVideo[], video: PartyVideo) {
+  if (videos.some((v) => v.partyVideoId === video.partyVideoId)) {
+    return;
+  }
+  const index = videos.findIndex(
+    (v) =>
+      v.position > video.position ||
+      (v.position === video.position && v.createdAt > video.createdAt)
+  );
+  if (index === -1) {
+    videos.push(video);
+  } else {
+    videos.splice(index, 0, video);
+  }
+}
 
 export const fetchParties = createAsyncThunk("party/fetchAll", () =>
   getUserParties()
@@ -93,8 +117,11 @@ export const joinParty = createAsyncThunk(
     await signalR.joinParty(member.partyId);
     // The register response has no party name; refresh the list to get it.
     await dispatch(fetchParties());
-    const members = await getMembers(member.partyId);
-    return { partyId: member.partyId, members };
+    const [members, videos] = await Promise.all([
+      getMembers(member.partyId),
+      getVideos(member.partyId),
+    ]);
+    return { partyId: member.partyId, members, videos };
   }
 );
 
@@ -158,8 +185,11 @@ export const openParty = createAsyncThunk(
   "party/open",
   async (partyId: string) => {
     await signalR.joinParty(partyId);
-    const members = await getMembers(partyId);
-    return { partyId, members };
+    const [members, videos] = await Promise.all([
+      getMembers(partyId),
+      getVideos(partyId),
+    ]);
+    return { partyId, members, videos };
   }
 );
 
@@ -197,6 +227,18 @@ const partySlice = createSlice({
         );
       }
     },
+    // Dispatched from the app-level SignalR subscription when any member
+    // (including this device, echoed back harmlessly thanks to the dedupe
+    // in insertVideo) adds a video to the open party.
+    videoAdded(state, action: PayloadAction<PartyVideo>) {
+      if (
+        state.activePartyId &&
+        action.payload.partyId.toLowerCase() ===
+          state.activePartyId.toLowerCase()
+      ) {
+        insertVideo(state.videos, action.payload);
+      }
+    },
     // Add Video is about to open YouTube for this party: remember it so the
     // link that comes back through the share sheet is posted to it, whatever
     // party happens to be open by then.
@@ -224,6 +266,7 @@ const partySlice = createSlice({
       if (state.activePartyId?.toLowerCase() === partyId) {
         state.activePartyId = null;
         state.members = [];
+        state.videos = [];
       }
       // A shared link can no longer target a party the user is not in.
       if (state.videoTargetPartyId?.toLowerCase() === partyId) {
@@ -254,6 +297,8 @@ const partySlice = createSlice({
         state.parties.unshift(action.payload.summary);
         state.activePartyId = action.payload.summary.partyId;
         state.members = action.payload.members;
+        // A brand-new party has nothing to fetch: its playlist is empty.
+        state.videos = [];
       })
       .addCase(createParty.rejected, (state, action) => {
         state.creating = false;
@@ -267,6 +312,7 @@ const partySlice = createSlice({
         state.joining = false;
         state.activePartyId = action.payload.partyId;
         state.members = action.payload.members;
+        state.videos = action.payload.videos;
       })
       .addCase(joinParty.rejected, (state, action) => {
         state.joining = false;
@@ -287,6 +333,7 @@ const partySlice = createSlice({
         if (state.activePartyId?.toLowerCase() === partyId) {
           state.activePartyId = null;
           state.members = [];
+          state.videos = [];
         }
         if (state.videoTargetPartyId?.toLowerCase() === partyId) {
           state.videoTargetPartyId = null;
@@ -296,19 +343,31 @@ const partySlice = createSlice({
         state.addingVideo = true;
         state.addVideoError = null;
       })
-      .addCase(addPendingVideo.fulfilled, (state) => {
+      .addCase(addPendingVideo.fulfilled, (state, action) => {
         state.addingVideo = false;
         state.pendingVideoUrl = null;
         state.videoTargetPartyId = null;
+        // Show the new video without waiting for the VideoAdded echo (which
+        // insertVideo then deduplicates). Skipped when it was posted to a
+        // party other than the open one.
+        if (
+          state.activePartyId &&
+          action.payload.partyId.toLowerCase() ===
+            state.activePartyId.toLowerCase()
+        ) {
+          insertVideo(state.videos, action.payload);
+        }
       })
       .addCase(addPendingVideo.rejected, (state, action) => {
         state.addingVideo = false;
         state.addVideoError = action.error.message ?? "Something went wrong";
       })
       .addCase(openParty.fulfilled, (state, action) => {
-        // Always replace: re-opening the same party refreshes its members.
+        // Always replace: re-opening the same party refreshes its members
+        // and playlist.
         state.activePartyId = action.payload.partyId;
         state.members = action.payload.members;
+        state.videos = action.payload.videos;
       });
   },
 });
@@ -322,6 +381,7 @@ export const {
   memberJoined,
   memberRemoved,
   removedFromParty,
+  videoAdded,
   videoRequested,
   videoShared,
 } = partySlice.actions;

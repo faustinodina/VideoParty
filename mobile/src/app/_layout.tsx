@@ -24,6 +24,7 @@ import {
   memberJoined,
   memberRemoved,
   removedFromParty,
+  videoAdded,
   videoShared,
 } from "@/store/partySlice";
 
@@ -46,7 +47,7 @@ function ShareIntentHandler() {
       // party). Without one this is a no-op (see the thunk's condition):
       // the link stays pending until a party can take it.
       store.dispatch(addPendingVideo());
-      router.navigate("/party");
+      router.navigate("/videos");
     }
     resetShareIntent();
   }, [hasShareIntent, shareIntent, resetShareIntent]);
@@ -76,6 +77,10 @@ export default function RootLayout() {
     // Bridge SignalR events into the store so any screen can select them.
     const unsubscribeJoined = signalR.onMemberJoined((member) => {
       store.dispatch(memberJoined(member));
+    });
+
+    const unsubscribeVideoAdded = signalR.onVideoAdded((video) => {
+      store.dispatch(videoAdded(video));
     });
 
     const unsubscribeRemoved = signalR.onMemberRemoved(async (member) => {
@@ -110,6 +115,7 @@ export default function RootLayout() {
 
     return () => {
       unsubscribeJoined();
+      unsubscribeVideoAdded();
       unsubscribeRemoved();
       unsubscribeReset();
       signalR.disconnect();

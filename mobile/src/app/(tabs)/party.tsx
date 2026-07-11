@@ -3,7 +3,6 @@ import { useState } from 'react';
 import {
   Alert,
   FlatList,
-  Linking,
   Platform,
   Pressable,
   Share,
@@ -18,12 +17,9 @@ import { useTheme } from '@/hooks/use-theme';
 import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  addPendingVideo,
-  clearPendingVideo,
   leaveParty,
   removeMember,
   selectActiveParty,
-  videoRequested,
 } from '@/store/partySlice';
 
 export default function PartyScreen() {
@@ -33,11 +29,6 @@ export default function PartyScreen() {
 
   const activeParty = useAppSelector(selectActiveParty);
   const members = useAppSelector((state) => state.party.members);
-  const pendingVideoUrl = useAppSelector(
-    (state) => state.party.pendingVideoUrl
-  );
-  const addingVideo = useAppSelector((state) => state.party.addingVideo);
-  const addVideoError = useAppSelector((state) => state.party.addVideoError);
 
   // Web-only fallback feedback: set when the invitation was copied to the
   // clipboard because the browser has no share dialog.
@@ -79,21 +70,6 @@ export default function PartyScreen() {
     }
   };
 
-  // Opens the YouTube app when installed; otherwise the website. openURL
-  // (not canOpenURL) because Android package-visibility rules make
-  // canOpenURL report false for apps the manifest does not declare.
-  const addVideo = async () => {
-    if (!activeParty) return;
-    // The share sheet gives the returning link no context; remembering the
-    // party here is what lets ShareIntentHandler post it automatically.
-    dispatch(videoRequested(activeParty.partyId));
-    try {
-      await Linking.openURL('vnd.youtube://');
-    } catch {
-      await Linking.openURL('https://www.youtube.com/');
-    }
-  };
-
   const exitParty = () => {
     if (!activeParty) return;
     // Leaving needs confirmation: getting back in takes a new invitation.
@@ -128,15 +104,6 @@ export default function PartyScreen() {
           <ThemedText themeColor="textSecondary" style={styles.empty}>
             Open a party from the Parties tab to see it here.
           </ThemedText>
-          {pendingVideoUrl && (
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.empty}
-            >
-              A video link is waiting: open a party to add it.
-            </ThemedText>
-          )}
         </ThemedView>
       </ThemedView>
     );
@@ -186,48 +153,7 @@ export default function PartyScreen() {
                   </ThemedText>
                 </Pressable>
               )}
-              <Pressable
-                onPress={addVideo}
-                style={({ pressed }) => [
-                  styles.shareButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <ThemedText type="smallBold" style={styles.shareButtonLabel}>
-                  Add Video
-                </ThemedText>
-              </Pressable>
             </ThemedView>
-            {pendingVideoUrl && (
-              <ThemedView type="backgroundElement" style={styles.pendingVideo}>
-                <ThemedText type="small" style={styles.pendingVideoUrl}>
-                  Video to add: {pendingVideoUrl}
-                </ThemedText>
-                <Pressable
-                  onPress={() => dispatch(addPendingVideo())}
-                  disabled={addingVideo}
-                  hitSlop={Spacing.two}
-                >
-                  <ThemedText type="smallBold" style={styles.addAction}>
-                    {addingVideo ? 'Adding…' : 'Add'}
-                  </ThemedText>
-                </Pressable>
-                <Pressable
-                  onPress={() => dispatch(clearPendingVideo())}
-                  disabled={addingVideo}
-                  hitSlop={Spacing.two}
-                >
-                  <ThemedText type="small" themeColor="danger">
-                    Dismiss
-                  </ThemedText>
-                </Pressable>
-              </ThemedView>
-            )}
-            {addVideoError && (
-              <ThemedText type="small" themeColor="danger">
-                Could not add the video: {addVideoError}
-              </ThemedText>
-            )}
             {copiedInvite && (
               <ThemedText type="small" themeColor="textSecondary">
                 Invitation copied to the clipboard.
@@ -323,22 +249,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  pendingVideo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderCurve: 'continuous',
-  },
-  pendingVideoUrl: {
-    flex: 1,
-  },
-  addAction: {
-    // Same accent as the action buttons above.
-    color: '#208AEF',
   },
   memberRow: {
     flexDirection: 'row',

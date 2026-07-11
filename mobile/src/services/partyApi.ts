@@ -153,6 +153,11 @@ export function removeMember(
   return del(`/VP/parties/${partyId}/members/${partyMemberId}`);
 }
 
+// The party's playlist in play order.
+export function getVideos(partyId: string): Promise<PartyVideo[]> {
+  return request<PartyVideo[]>(`/VP/parties/${partyId}/videos`);
+}
+
 // Appends a video to the party's playlist. Any member of the party may add.
 export function addVideo(partyId: string, url: string): Promise<PartyVideo> {
   return post<PartyVideo>(`/VP/parties/${partyId}/videos`, { url });
