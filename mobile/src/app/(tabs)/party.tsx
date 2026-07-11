@@ -1,6 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Platform, Pressable, Share, StyleSheet } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Linking,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+} from 'react-native';
 
 import AppHeader from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
@@ -56,6 +64,17 @@ export default function PartyScreen() {
       }
     } catch {
       // Dismissing the share dialog rejects on some platforms; not an error.
+    }
+  };
+
+  // Opens the YouTube app when installed; otherwise the website. openURL
+  // (not canOpenURL) because Android package-visibility rules make
+  // canOpenURL report false for apps the manifest does not declare.
+  const addVideo = async () => {
+    try {
+      await Linking.openURL('vnd.youtube://');
+    } catch {
+      await Linking.openURL('https://www.youtube.com/');
     }
   };
 
@@ -116,31 +135,44 @@ export default function PartyScreen() {
               {activeParty.role === 'organizer' &&
                 ' Each Share Party invite admits one guest.'}
             </ThemedText>
-            {activeParty.role === 'organizer' ? (
+            <ThemedView style={styles.actionRow}>
+              {activeParty.role === 'organizer' ? (
+                <Pressable
+                  onPress={shareParty}
+                  style={({ pressed }) => [
+                    styles.shareButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText type="smallBold" style={styles.shareButtonLabel}>
+                    Share Party
+                  </ThemedText>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={exitParty}
+                  style={({ pressed }) => [
+                    styles.leaveButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText type="smallBold" style={styles.shareButtonLabel}>
+                    Leave Party
+                  </ThemedText>
+                </Pressable>
+              )}
               <Pressable
-                onPress={shareParty}
+                onPress={addVideo}
                 style={({ pressed }) => [
                   styles.shareButton,
                   pressed && styles.pressed,
                 ]}
               >
                 <ThemedText type="smallBold" style={styles.shareButtonLabel}>
-                  Share Party
+                  Add Video
                 </ThemedText>
               </Pressable>
-            ) : (
-              <Pressable
-                onPress={exitParty}
-                style={({ pressed }) => [
-                  styles.leaveButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <ThemedText type="smallBold" style={styles.shareButtonLabel}>
-                  Leave Party
-                </ThemedText>
-              </Pressable>
-            )}
+            </ThemedView>
             {copiedInvite && (
               <ThemedText type="small" themeColor="textSecondary">
                 Invitation copied to the clipboard.
@@ -211,6 +243,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   header: {
+    gap: Spacing.three,
+  },
+  actionRow: {
+    flexDirection: 'row',
     gap: Spacing.three,
   },
   shareButton: {
