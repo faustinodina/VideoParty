@@ -60,24 +60,24 @@ export default function PartiesScreen() {
   };
 
   const submitJoin = async () => {
-    if (inviteInput.trim().length === 0) return;
+    const raw = inviteInput.trim();
+    if (raw.length === 0) return;
 
-    // The invite code is "<partyId>/<invitationId>"; extracting the guids
-    // also accepts a pasted share message or deep link in any format.
-    const guids = inviteInput.match(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
-    );
-    if (!guids || guids.length < 2) {
+    // The invite is a short 8-character code; a pasted deep link
+    // (videoparty://join/<code>) is accepted too. The server treats codes
+    // case-insensitively, but normalize here for a tidy request.
+    const linkMatch = raw.match(/join\/([0-9a-z]+)/i);
+    const code = (linkMatch ? linkMatch[1] : raw).toUpperCase();
+    if (!/^[0-9A-Z]{8}$/.test(code)) {
       setInviteError(
-        "That does not look like an invite code. Paste the full code from the invitation (two ids separated by a slash)."
+        "That does not look like an invite code. It is the 8-character code from the invitation."
       );
       return;
     }
     setInviteError(null);
 
-    const [partyId, invitationId] = guids;
     try {
-      await dispatch(joinParty({ partyId, invitationId })).unwrap();
+      await dispatch(joinParty(code)).unwrap();
       setInviteInput("");
       setFormMode("none");
       router.navigate("/party");
@@ -151,9 +151,9 @@ export default function PartiesScreen() {
                 <TextInput
                   value={inviteInput}
                   onChangeText={setInviteInput}
-                  placeholder="Paste invite code"
+                  placeholder="Enter invite code"
                   placeholderTextColor={theme.textSecondary}
-                  autoCapitalize="none"
+                  autoCapitalize="characters"
                   autoCorrect={false}
                   autoFocus
                   style={inputStyle}

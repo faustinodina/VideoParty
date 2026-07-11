@@ -8,8 +8,10 @@ namespace VideoParty.Model.Models
   // member's PartyMember.InvitationId (unique, so one use at most).
   public class PartyInvitation : ITimestamped
   {
+    // A short human-typeable code (see VPController.NewInvitationCode),
+    // always stored uppercase.
     [Key]
-    public required Guid InvitationId { get; set; }
+    public required string InvitationId { get; set; }
 
     public required Guid PartyId { get; set; }
 

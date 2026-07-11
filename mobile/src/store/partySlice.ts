@@ -67,18 +67,12 @@ export const createParty = createAsyncThunk(
 
 // Registers this user as a member of an existing party (so it shows up in
 // the party list from now on), then joins its SignalR group. The invitation
-// id comes from the organizer's share and is valid for one join only.
+// code comes from the organizer's share, identifies the party by itself,
+// and is valid for one join only.
 export const joinParty = createAsyncThunk(
   "party/join",
-  async (
-    { partyId, invitationId }: { partyId: string; invitationId: string },
-    { dispatch }
-  ) => {
-    const member = await registerMember(
-      partyId,
-      await getUserName(),
-      invitationId
-    );
+  async (invitationCode: string, { dispatch }) => {
+    const member = await registerMember(invitationCode, await getUserName());
     await signalR.joinParty(member.partyId);
     // The register response has no party name; refresh the list to get it.
     await dispatch(fetchParties());

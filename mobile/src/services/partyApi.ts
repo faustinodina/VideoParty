@@ -41,6 +41,7 @@ export interface PartyMember {
 // Mirrors PartyInvitation returned by POST /VP/parties/{partyId}/invitations.
 export interface PartyInvitation {
   partyId: string;
+  /** Short uppercase code, e.g. "K7MWPX2A"; joining needs only this. */
   invitationId: string;
 }
 
@@ -111,14 +112,14 @@ export function createInvitation(partyId: string): Promise<PartyInvitation> {
   return post<PartyInvitation>(`/VP/parties/${partyId}/invitations`, {});
 }
 
+// The code identifies the party it was minted for; the joined party comes
+// back in the response.
 export function registerMember(
-  partyId: string,
-  displayName: string,
-  invitationId: string
+  invitationCode: string,
+  displayName: string
 ): Promise<PartyMember> {
-  return post<PartyMember>(`/VP/parties/${partyId}/members`, {
+  return post<PartyMember>(`/VP/invitations/${invitationCode}/members`, {
     displayName,
-    invitationId,
   });
 }
 

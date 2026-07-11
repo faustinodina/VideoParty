@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -26,6 +27,27 @@ namespace VideoParty.Api.Controllers
     // The authenticated caller, from the JWT's `sub` claim (see AuthController).
     private Guid CallerUserId =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    // Short enough to type, ~2^39 combinations; the alphabet drops the
+    // characters people misread (0/O, 1/I/L) and U (Crockford's obscenity
+    // guard). Codes are single-use and party-bound, so this is ample.
+    private const int InvitationCodeLength = 8;
+    private const string InvitationCodeAlphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+
+    private static string NewInvitationCode()
+    {
+      Span<char> chars = stackalloc char[InvitationCodeLength];
+      for (var i = 0; i < chars.Length; i++)
+      {
+        chars[i] = InvitationCodeAlphabet[
+            RandomNumberGenerator.GetInt32(InvitationCodeAlphabet.Length)];
+      }
+      return new string(chars);
+    }
+
+    // Codes are stored uppercase; accept however the guest typed it.
+    private static string NormalizeInvitationCode(string code) =>
+        code.Trim().ToUpperInvariant();
 
     [HttpGet("parties/{id:guid}", Name = nameof(GetParty))]
     public async Task<ActionResult<Party>> GetParty(Guid id)
@@ -140,27 +162,43 @@ namespace VideoParty.Api.Controllers
             "Only the organizer can invite people to this party.");
       }
 
-      var invitation = new PartyInvitation
+      // Retry on the (rare) chance the generated code already exists; the
+      // primary key turns a concurrent duplicate into a DbUpdateException.
+      for (var attempt = 0; ; attempt++)
       {
-        InvitationId = Guid.NewGuid(),
-        PartyId = partyId
-      };
+        var invitation = new PartyInvitation
+        {
+          InvitationId = NewInvitationCode(),
+          PartyId = partyId
+        };
 
-      _db.PartyInvitations.Add(invitation);
-      await _db.SaveChangesAsync();
-
-      return invitation;
+        _db.PartyInvitations.Add(invitation);
+        try
+        {
+          await _db.SaveChangesAsync();
+          return invitation;
+        }
+        catch (DbUpdateException) when (attempt < 4)
+        {
+          _db.Entry(invitation).State = EntityState.Detached;
+        }
+      }
     }
 
-    [HttpPost("parties/{partyId:guid}/members")]
-    public async Task<ActionResult<PartyMember>> RegisterMember(Guid partyId, RegisterMemberRequest request)
+    // Joining is by invitation code alone: the code was minted for exactly
+    // one party (see CreateInvitation), so the party is derived from it.
+    [HttpPost("invitations/{code}/members")]
+    public async Task<ActionResult<PartyMember>> RegisterMember(string code, RegisterMemberRequest request)
     {
-      var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
-      if (!partyExists)
+      code = NormalizeInvitationCode(code);
+
+      var invitation = await _db.PartyInvitations.FindAsync(code);
+      if (invitation is null)
       {
-        return NotFound($"Party '{partyId}' was not found.");
+        return NotFound("This invitation is not valid. Ask the organizer for a new one.");
       }
 
+      var partyId = invitation.PartyId;
       var userId = CallerUserId;
 
       // Joining twice from the same device is a no-op: return the existing
@@ -172,24 +210,10 @@ namespace VideoParty.Api.Controllers
         return existing;
       }
 
-      if (request.InvitationId is not Guid invitationId)
-      {
-        return BadRequest("An invitation is required to join this party.");
-      }
-
-      // Only invitations the organizer actually minted for THIS party are
-      // accepted; a guessed id or one shared for another party fails here.
-      var invitationExists = await _db.PartyInvitations
-          .AnyAsync(i => i.InvitationId == invitationId && i.PartyId == partyId);
-      if (!invitationExists)
-      {
-        return BadRequest("This invitation is not valid for this party.");
-      }
-
       // Each invitation admits one member; the unique index on InvitationId
       // backs this check against concurrent joins.
       var invitationUsed = await _db.PartyMembers
-          .AnyAsync(m => m.InvitationId == invitationId);
+          .AnyAsync(m => m.InvitationId == code);
       if (invitationUsed)
       {
         return Conflict("This invitation has already been used. Ask the organizer for a new one.");
@@ -201,7 +225,7 @@ namespace VideoParty.Api.Controllers
         PartyId = partyId,
         UserId = userId,
         DisplayName = request.DisplayName,
-        InvitationId = invitationId
+        InvitationId = code
       };
 
       _db.PartyMembers.Add(member);
@@ -280,7 +304,7 @@ namespace VideoParty.Api.Controllers
 
   public record CreatePartyRequest(string Name, string OrganizerName);
 
-  public record RegisterMemberRequest(string DisplayName, Guid? InvitationId);
+  public record RegisterMemberRequest(string DisplayName);
 
   public enum PartyRole
   {

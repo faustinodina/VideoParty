@@ -22,10 +22,10 @@ namespace VideoParty.Model.Models
 
     public required string DisplayName { get; set; }
 
-    // The single-use invitation this member joined with. Null only for the
-    // organizer's own row, which is created with the party itself. A unique
-    // index (see ApplicationDbContext) enforces the single use.
-    public Guid? InvitationId { get; set; }
+    // The single-use invitation code this member joined with. Null only for
+    // the organizer's own row, which is created with the party itself. A
+    // unique index (see ApplicationDbContext) enforces the single use.
+    public string? InvitationId { get; set; }
 
     // Set by ApplicationDbContext on save; not `required` on purpose.
     public DateTime CreatedAt { get; set; }

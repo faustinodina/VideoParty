@@ -38,8 +38,8 @@ export default function PartyScreen() {
 
     const message =
       `Join my party "${activeParty.name}" on VideoParty!\n` +
-      `Tap to join: videoparty://join/${activeParty.partyId}?invite=${invitationId}\n` +
-      `Or paste this invite code into Join Party: ${activeParty.partyId}/${invitationId}`;
+      `Tap to join: videoparty://join/${invitationId}\n` +
+      `Or type this invite code into Join Party: ${invitationId}`;
 
     try {
       if (Platform.OS === 'web') {
