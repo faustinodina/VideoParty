@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { removeMember, selectActiveParty } from '@/store/partySlice';
 
@@ -19,13 +20,26 @@ export default function PartyScreen() {
   // Web-only fallback feedback: set when the invitation was copied to the
   // clipboard because the browser has no share dialog.
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const shareParty = async () => {
     if (!activeParty) return;
+    setShareError(null);
+
+    // Every share gets its own single-use invitation; the API rejects a
+    // second join with the same id.
+    let invitationId: string;
+    try {
+      ({ invitationId } = await createInvitation(activeParty.partyId));
+    } catch {
+      setShareError('Could not create an invitation. Check your connection and try again.');
+      return;
+    }
+
     const message =
       `Join my party "${activeParty.name}" on VideoParty!\n` +
-      `Tap to join: videoparty://join/${activeParty.partyId}\n` +
-      `Or paste this id into Join Party: ${activeParty.partyId}`;
+      `Tap to join: videoparty://join/${activeParty.partyId}?invite=${invitationId}\n` +
+      `Or paste this invite code into Join Party: ${activeParty.partyId}/${invitationId}`;
 
     try {
       if (Platform.OS === 'web') {
@@ -70,7 +84,7 @@ export default function PartyScreen() {
             <ThemedText type="title">{activeParty.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               You are {activeParty.role === 'organizer' ? 'the organizer' : 'a guest'} of
-              this party. Share the id below so others can join.
+              this party. Each Share Party invite admits one guest.
             </ThemedText>
             <ThemedView type="backgroundElement" style={styles.idBox}>
               <ThemedText type="code" selectable>
@@ -93,6 +107,11 @@ export default function PartyScreen() {
             {copiedInvite && (
               <ThemedText type="small" themeColor="textSecondary">
                 Invitation copied to the clipboard.
+              </ThemedText>
+            )}
+            {shareError && (
+              <ThemedText type="small" themeColor="danger">
+                {shareError}
               </ThemedText>
             )}
             <ThemedText type="subtitle">Members</ThemedText>

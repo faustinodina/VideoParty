@@ -11,37 +11,49 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { joinParty } from "@/store/partySlice";
 
 /**
- * Deep-link target for party invitations (videoparty://join/<partyId>).
+ * Deep-link target for party invitations
+ * (videoparty://join/<partyId>?invite=<invitationId>).
  * Joins the party immediately and lands on the Party tab; on failure the
  * error stays on screen with a way back to the party list.
  */
 export default function JoinByLinkScreen() {
-  const { partyId } = useLocalSearchParams<{ partyId: string }>();
+  const { partyId, invite } = useLocalSearchParams<{
+    partyId: string;
+    invite?: string;
+  }>();
   const router = useRouter();
   const theme = useTheme();
   const dispatch = useAppDispatch();
 
   const joinError = useAppSelector((state) => state.party.joinError);
+  // A link without an invitation (e.g. from an old share) can never join;
+  // fail locally instead of round-tripping to the API.
+  const localError =
+    partyId && !invite
+      ? "This invite link is incomplete. Ask the organizer to share the party again."
+      : null;
 
   useEffect(() => {
-    if (!partyId) return;
-    dispatch(joinParty(partyId))
+    if (!partyId || !invite) return;
+    dispatch(joinParty({ partyId, invitationId: invite }))
       .unwrap()
       .then(() => router.replace("/party"))
       .catch(() => {
         // Failure is surfaced via joinError from the store.
       });
-  }, [dispatch, partyId, router]);
+  }, [dispatch, partyId, invite, router]);
+
+  const error = localError ?? joinError;
 
   return (
     <ThemedView style={styles.screen}>
       <AppHeader />
       <ThemedView style={styles.body}>
-        {joinError ? (
+        {error ? (
           <>
             <ThemedText type="subtitle">Could not join</ThemedText>
             <ThemedText themeColor="textSecondary" style={styles.centered}>
-              {joinError}
+              {error}
             </ThemedText>
             <Pressable
               onPress={() => router.replace("/")}

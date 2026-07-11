@@ -18,11 +18,18 @@ namespace VideoParty.DataAccess.Data
 
     public DbSet<Party> Parties { get; set; }
     public DbSet<PartyMember> PartyMembers { get; set; }
+    public DbSet<PartyInvitation> PartyInvitations { get; set; }
     public DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
       base.OnModelCreating(modelBuilder);
+
+      // An invitation can be used by at most one member. NULLs (organizer
+      // rows) are distinct from each other, so multiple are allowed.
+      modelBuilder.Entity<PartyMember>()
+          .HasIndex(m => m.InvitationId)
+          .IsUnique();
 
       // SQLite stores DateTime as TEXT with no kind, so values read back are
       // Kind=Unspecified and would serialize without the Z suffix. All stored

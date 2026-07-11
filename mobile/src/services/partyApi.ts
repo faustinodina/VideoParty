@@ -38,6 +38,12 @@ export interface PartyMember {
   updatedAt: string;
 }
 
+// Mirrors PartyInvitation returned by POST /VP/parties/{partyId}/invitations.
+export interface PartyInvitation {
+  partyId: string;
+  invitationId: string;
+}
+
 // Attaches the bearer token; a 401 means it expired between the local expiry
 // check and the server's, so refresh once and retry.
 async function authorizedFetch(
@@ -99,12 +105,20 @@ export function createParty(
   return post<Party>("/VP/parties", { name, organizerName });
 }
 
+// Organizer-only: mints a single-use invitation id for the party. Each call
+// returns a fresh id; it is consumed by the first registerMember that uses it.
+export function createInvitation(partyId: string): Promise<PartyInvitation> {
+  return post<PartyInvitation>(`/VP/parties/${partyId}/invitations`, {});
+}
+
 export function registerMember(
   partyId: string,
-  displayName: string
+  displayName: string,
+  invitationId: string
 ): Promise<PartyMember> {
   return post<PartyMember>(`/VP/parties/${partyId}/members`, {
     displayName,
+    invitationId,
   });
 }
 

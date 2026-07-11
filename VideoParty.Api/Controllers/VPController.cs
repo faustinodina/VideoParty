@@ -121,6 +121,37 @@ namespace VideoParty.Api.Controllers
       return CreatedAtAction(nameof(GetParty), new { id = party.PartyId }, party);
     }
 
+    // Issues a fresh single-use invitation for the party. Persisting it here
+    // is what lets RegisterMember insist the id was really minted for the
+    // party being joined; the id is consumed by the PartyMember row created
+    // when someone joins with it.
+    [HttpPost("parties/{partyId:guid}/invitations")]
+    public async Task<ActionResult<PartyInvitation>> CreateInvitation(Guid partyId)
+    {
+      var party = await _db.Parties.FindAsync(partyId);
+      if (party is null)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      if (party.OrganizerUserId != CallerUserId)
+      {
+        return StatusCode(StatusCodes.Status403Forbidden,
+            "Only the organizer can invite people to this party.");
+      }
+
+      var invitation = new PartyInvitation
+      {
+        InvitationId = Guid.NewGuid(),
+        PartyId = partyId
+      };
+
+      _db.PartyInvitations.Add(invitation);
+      await _db.SaveChangesAsync();
+
+      return invitation;
+    }
+
     [HttpPost("parties/{partyId:guid}/members")]
     public async Task<ActionResult<PartyMember>> RegisterMember(Guid partyId, RegisterMemberRequest request)
     {
@@ -132,7 +163,8 @@ namespace VideoParty.Api.Controllers
 
       var userId = CallerUserId;
 
-      // Joining twice from the same device is a no-op: return the existing member.
+      // Joining twice from the same device is a no-op: return the existing
+      // member without consuming the invitation.
       var existing = await _db.PartyMembers
           .FirstOrDefaultAsync(m => m.PartyId == partyId && m.UserId == userId);
       if (existing is not null)
@@ -140,16 +172,49 @@ namespace VideoParty.Api.Controllers
         return existing;
       }
 
+      if (request.InvitationId is not Guid invitationId)
+      {
+        return BadRequest("An invitation is required to join this party.");
+      }
+
+      // Only invitations the organizer actually minted for THIS party are
+      // accepted; a guessed id or one shared for another party fails here.
+      var invitationExists = await _db.PartyInvitations
+          .AnyAsync(i => i.InvitationId == invitationId && i.PartyId == partyId);
+      if (!invitationExists)
+      {
+        return BadRequest("This invitation is not valid for this party.");
+      }
+
+      // Each invitation admits one member; the unique index on InvitationId
+      // backs this check against concurrent joins.
+      var invitationUsed = await _db.PartyMembers
+          .AnyAsync(m => m.InvitationId == invitationId);
+      if (invitationUsed)
+      {
+        return Conflict("This invitation has already been used. Ask the organizer for a new one.");
+      }
+
       var member = new PartyMember
       {
         PartyMemberId = Guid.NewGuid(),
         PartyId = partyId,
         UserId = userId,
-        DisplayName = request.DisplayName
+        DisplayName = request.DisplayName,
+        InvitationId = invitationId
       };
 
       _db.PartyMembers.Add(member);
-      await _db.SaveChangesAsync();
+      try
+      {
+        await _db.SaveChangesAsync();
+      }
+      catch (DbUpdateException)
+      {
+        // Two joins raced on the same invitation; the unique index let only
+        // the first one through.
+        return Conflict("This invitation has already been used. Ask the organizer for a new one.");
+      }
 
       // Same shape as GetMembers items so clients can mix fetched and live data.
       await _hub.Clients.Group(partyId.ToString()).SendAsync("MemberJoined", new
@@ -215,7 +280,7 @@ namespace VideoParty.Api.Controllers
 
   public record CreatePartyRequest(string Name, string OrganizerName);
 
-  public record RegisterMemberRequest(string DisplayName);
+  public record RegisterMemberRequest(string DisplayName, Guid? InvitationId);
 
   public enum PartyRole
   {

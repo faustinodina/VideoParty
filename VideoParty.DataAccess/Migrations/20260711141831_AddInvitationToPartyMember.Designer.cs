@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VideoParty.DataAccess.Data;
 
@@ -10,9 +11,11 @@ using VideoParty.DataAccess.Data;
 namespace VideoParty.DataAccess.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260711141831_AddInvitationToPartyMember")]
+    partial class AddInvitationToPartyMember
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -39,28 +42,6 @@ namespace VideoParty.DataAccess.Migrations
                     b.HasKey("PartyId");
 
                     b.ToTable("Parties");
-                });
-
-            modelBuilder.Entity("VideoParty.Model.Models.PartyInvitation", b =>
-                {
-                    b.Property<Guid>("InvitationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("PartyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("InvitationId");
-
-                    b.HasIndex("PartyId");
-
-                    b.ToTable("PartyInvitations");
                 });
 
             modelBuilder.Entity("VideoParty.Model.Models.PartyMember", b =>
@@ -121,17 +102,6 @@ namespace VideoParty.DataAccess.Migrations
                     b.HasKey("UserId");
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("VideoParty.Model.Models.PartyInvitation", b =>
-                {
-                    b.HasOne("VideoParty.Model.Models.Party", "Party")
-                        .WithMany()
-                        .HasForeignKey("PartyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Party");
                 });
 
             modelBuilder.Entity("VideoParty.Model.Models.PartyMember", b =>

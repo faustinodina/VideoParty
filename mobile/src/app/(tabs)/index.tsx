@@ -38,7 +38,8 @@ export default function PartiesScreen() {
 
   const [formMode, setFormMode] = useState<FormMode>("none");
   const [partyName, setPartyName] = useState("");
-  const [partyIdInput, setPartyIdInput] = useState("");
+  const [inviteInput, setInviteInput] = useState("");
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchParties());
@@ -59,12 +60,25 @@ export default function PartiesScreen() {
   };
 
   const submitJoin = async () => {
-    const partyId = partyIdInput.trim();
-    if (partyId.length === 0) return;
+    if (inviteInput.trim().length === 0) return;
 
+    // The invite code is "<partyId>/<invitationId>"; extracting the guids
+    // also accepts a pasted share message or deep link in any format.
+    const guids = inviteInput.match(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+    );
+    if (!guids || guids.length < 2) {
+      setInviteError(
+        "That does not look like an invite code. Paste the full code from the invitation (two ids separated by a slash)."
+      );
+      return;
+    }
+    setInviteError(null);
+
+    const [partyId, invitationId] = guids;
     try {
-      await dispatch(joinParty(partyId)).unwrap();
-      setPartyIdInput("");
+      await dispatch(joinParty({ partyId, invitationId })).unwrap();
+      setInviteInput("");
       setFormMode("none");
       router.navigate("/party");
     } catch {
@@ -135,9 +149,9 @@ export default function PartiesScreen() {
             {formMode === "join" && (
               <ThemedView style={styles.form}>
                 <TextInput
-                  value={partyIdInput}
-                  onChangeText={setPartyIdInput}
-                  placeholder="Enter party id"
+                  value={inviteInput}
+                  onChangeText={setInviteInput}
+                  placeholder="Paste invite code"
                   placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -150,7 +164,9 @@ export default function PartiesScreen() {
                   disabled={joining}
                   onPress={submitJoin}
                 />
-                {joinError && <ErrorText message={joinError} />}
+                {(inviteError ?? joinError) && (
+                  <ErrorText message={(inviteError ?? joinError)!} />
+                )}
               </ThemedView>
             )}
 
@@ -177,7 +193,7 @@ export default function PartiesScreen() {
         ListEmptyComponent={
           loadingParties ? null : (
             <ThemedText themeColor="textSecondary" style={styles.empty}>
-              No parties yet. Create one or join with a party id.
+              No parties yet. Create one or join with an invite code.
             </ThemedText>
           )
         }
