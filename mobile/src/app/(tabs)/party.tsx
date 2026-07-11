@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Platform, Pressable, Share, StyleSheet } from 'react-native';
+import { Alert, FlatList, Platform, Pressable, Share, StyleSheet } from 'react-native';
 
 import AppHeader from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
@@ -59,16 +59,30 @@ export default function PartyScreen() {
     }
   };
 
-  const exitParty = async () => {
+  const exitParty = () => {
     if (!activeParty) return;
-    try {
-      await dispatch(leaveParty(activeParty.partyId)).unwrap();
-      // The active party is gone; land back on the list.
-      router.navigate('/');
-    } catch {
-      // Consistent with removeMember: a failed leave just leaves the party
-      // open.
-    }
+    // Leaving needs confirmation: getting back in takes a new invitation.
+    Alert.alert(
+      'Leave party?',
+      `You will need a new invitation to rejoin "${activeParty.name}".`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await dispatch(leaveParty(activeParty.partyId)).unwrap();
+              // The active party is gone; land back on the list.
+              router.navigate('/');
+            } catch {
+              // Consistent with removeMember: a failed leave just leaves
+              // the party open.
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (!activeParty) {

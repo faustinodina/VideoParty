@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, TextInput } from "react-native";
+import { Alert, FlatList, Pressable, StyleSheet, TextInput } from "react-native";
 
 import AppHeader from "@/components/app-header";
 import { ThemedText } from "@/components/themed-text";
@@ -90,6 +90,22 @@ export default function PartiesScreen() {
   const openExisting = (partyId: string) => {
     dispatch(openParty(partyId));
     router.navigate("/party");
+  };
+
+  // Leaving needs confirmation: getting back in takes a new invitation.
+  const confirmLeave = (partyId: string, name: string) => {
+    Alert.alert(
+      "Leave party?",
+      `You will need a new invitation to rejoin "${name}".`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: () => dispatch(leaveParty(partyId)),
+        },
+      ]
+    );
   };
 
   const inputStyle = [
@@ -190,7 +206,7 @@ export default function PartiesScreen() {
               </ThemedView>
               {item.role === "guest" && (
                 <Pressable
-                  onPress={() => dispatch(leaveParty(item.partyId))}
+                  onPress={() => confirmLeave(item.partyId, item.name)}
                   hitSlop={Spacing.two}
                 >
                   <ThemedText type="small" themeColor="danger">
