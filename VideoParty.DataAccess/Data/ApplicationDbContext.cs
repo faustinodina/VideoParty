@@ -19,6 +19,7 @@ namespace VideoParty.DataAccess.Data
     public DbSet<Party> Parties { get; set; }
     public DbSet<PartyMember> PartyMembers { get; set; }
     public DbSet<PartyInvitation> PartyInvitations { get; set; }
+    public DbSet<PartyVideo> PartyVideos { get; set; }
     public DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -30,6 +31,10 @@ namespace VideoParty.DataAccess.Data
       modelBuilder.Entity<PartyMember>()
           .HasIndex(m => m.InvitationId)
           .IsUnique();
+
+      // Playlists are always read per party in play order.
+      modelBuilder.Entity<PartyVideo>()
+          .HasIndex(v => new { v.PartyId, v.Position });
 
       // SQLite stores DateTime as TEXT with no kind, so values read back are
       // Kind=Unspecified and would serialize without the Z suffix. All stored
