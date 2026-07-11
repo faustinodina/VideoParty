@@ -210,11 +210,9 @@ namespace VideoParty.Api.Controllers
         return existing;
       }
 
-      // Each invitation admits one member; the unique index on InvitationId
-      // backs this check against concurrent joins.
-      var invitationUsed = await _db.PartyMembers
-          .AnyAsync(m => m.InvitationId == code);
-      if (invitationUsed)
+      // Consumption lives on the invitation, not the member row, so removing
+      // the member later does not make the code valid again.
+      if (invitation.UsedAt is not null)
       {
         return Conflict("This invitation has already been used. Ask the organizer for a new one.");
       }
@@ -228,6 +226,9 @@ namespace VideoParty.Api.Controllers
         InvitationId = code
       };
 
+      // One SaveChanges: the member is admitted and the invitation consumed
+      // in the same transaction.
+      invitation.UsedAt = DateTime.UtcNow;
       _db.PartyMembers.Add(member);
       try
       {
@@ -235,8 +236,8 @@ namespace VideoParty.Api.Controllers
       }
       catch (DbUpdateException)
       {
-        // Two joins raced on the same invitation; the unique index let only
-        // the first one through.
+        // Two joins raced on the same invitation; the unique index on
+        // PartyMember.InvitationId let only the first one through.
         return Conflict("This invitation has already been used. Ask the organizer for a new one.");
       }
 
