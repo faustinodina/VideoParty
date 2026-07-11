@@ -84,13 +84,10 @@ export default function PartyScreen() {
             <ThemedText type="title">{activeParty.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               You are {activeParty.role === 'organizer' ? 'the organizer' : 'a guest'} of
-              this party. Each Share Party invite admits one guest.
+              this party.
+              {activeParty.role === 'organizer' &&
+                ' Each Share Party invite admits one guest.'}
             </ThemedText>
-            <ThemedView type="backgroundElement" style={styles.idBox}>
-              <ThemedText type="code" selectable>
-                {activeParty.partyId}
-              </ThemedText>
-            </ThemedView>
             {activeParty.role === 'organizer' && (
               <Pressable
                 onPress={shareParty}
@@ -175,13 +172,6 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: Spacing.three,
-  },
-  idBox: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderCurve: 'continuous',
-    alignSelf: 'flex-start',
   },
   shareButton: {
     backgroundColor: '#208AEF',
