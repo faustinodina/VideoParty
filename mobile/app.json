@@ -29,7 +29,7 @@
       [
         "react-native-google-cast",
         {
-          "receiverAppId": "CC1AD845"
+          "receiverAppId": "24BBA0E0"
         }
       ],
       "./plugins/withWindowsJavaHome.js",
