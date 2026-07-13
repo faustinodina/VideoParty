@@ -27,6 +27,13 @@
     "plugins": [
       "expo-router",
       [
+        "react-native-google-cast",
+        {
+          "receiverAppId": "CC1AD845"
+        }
+      ],
+      "./plugins/withWindowsJavaHome.js",
+      [
         "expo-share-intent",
         {
           "androidIntentFilters": ["text/*"]

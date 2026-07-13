@@ -1,11 +1,19 @@
 import { Image } from 'expo-image';
+import { useCallback, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet } from 'react-native';
+import { CastButton, useCastChannel } from 'react-native-google-cast';
 
 import AppHeader from '@/components/app-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  CAST_NAMESPACE,
+  CastCommand,
+  CastStatus,
+  extractYouTubeVideoId,
+} from '@/services/castService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   addPendingVideo,
@@ -26,6 +34,35 @@ export default function VideosScreen() {
   );
   const addingVideo = useAppSelector((state) => state.party.addingVideo);
   const addVideoError = useAppSelector((state) => state.party.addVideoError);
+
+  // Casting is organizer-only: the organizer's phone is at the party, next
+  // to the TV. Guests never see the cast UI.
+  const isOrganizer = activeParty?.role === 'organizer';
+  const [castError, setCastError] = useState<string | null>(null);
+  // Non-null only while a cast session is connected; also how the receiver
+  // reports playback failures (most importantly embed-blocked videos).
+  const castChannel = useCastChannel(
+    CAST_NAMESPACE,
+    useCallback((message: Record<string, any> | string) => {
+      if (typeof message === 'string' || message.type !== 'status') return;
+      const status = message as CastStatus;
+      if (status.state === 'error') {
+        setCastError(
+          status.embedBlocked
+            ? "This video can't play on the TV: its owner disabled embedding. It still plays in YouTube."
+            : `The TV could not play this video (error ${status.errorCode}).`
+        );
+      }
+    }, [])
+  );
+
+  const playOnTv = (url: string) => {
+    const videoId = extractYouTubeVideoId(url);
+    if (!videoId || !castChannel) return;
+    setCastError(null);
+    const command: CastCommand = { type: 'play', videoId };
+    castChannel.sendMessage(command);
+  };
 
   // Opens the YouTube app when installed; otherwise the website. openURL
   // (not canOpenURL) because Android package-visibility rules make
@@ -94,7 +131,15 @@ export default function VideosScreen() {
                   Add Video
                 </ThemedText>
               </Pressable>
+              {isOrganizer && (
+                <CastButton style={styles.castButton} tintColor={theme.text} />
+              )}
             </ThemedView>
+            {castError && (
+              <ThemedText type="small" themeColor="danger">
+                {castError}
+              </ThemedText>
+            )}
             {pendingVideoUrl && (
               <ThemedView type="backgroundElement" style={styles.pendingVideo}>
                 <ThemedText type="small" style={styles.pendingVideoUrl}>
@@ -151,6 +196,16 @@ export default function VideosScreen() {
                   added by {addedBy(item.addedByUserId)}
                 </ThemedText>
               </ThemedView>
+              {castChannel && extractYouTubeVideoId(item.url) && (
+                <Pressable
+                  onPress={() => playOnTv(item.url)}
+                  hitSlop={Spacing.two}
+                >
+                  <ThemedText type="smallBold" style={styles.playOnTv}>
+                    ▶ TV
+                  </ThemedText>
+                </Pressable>
+              )}
             </ThemedView>
           </Pressable>
         )}
@@ -201,6 +256,15 @@ const styles = StyleSheet.create({
   },
   addButtonLabel: {
     color: '#ffffff',
+  },
+  castButton: {
+    width: 40,
+    height: 40,
+    alignSelf: 'center',
+  },
+  playOnTv: {
+    // Same accent as the Add Video button.
+    color: '#208AEF',
   },
   pressed: {
     opacity: 0.7,

@@ -1,0 +1,182 @@
+<!doctype html>
+<!--
+  VideoParty Cast receiver: the page a Chromecast loads when the organizer
+  casts. Registered in the Google Cast Developer Console as a Custom
+  Receiver; the console's app ID is what the mobile app launches. Plays
+  YouTube videos through the IFrame player, driven by messages from the
+  phone over the VideoParty namespace (see NAMESPACE below).
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>VideoParty</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #101418;
+        color: #e8eef4;
+        font-family: system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #player {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #idle {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5em;
+        background: #101418;
+      }
+      #idle h1 {
+        font-size: 3em;
+        margin: 0;
+        color: #208aef;
+      }
+      #idle p {
+        margin: 0;
+        color: #9ab0c4;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="player"></div>
+    <div id="idle">
+      <h1>VideoParty</h1>
+      <p id="idle-message">Ready — pick a video on your phone.</p>
+    </div>
+
+    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+      const NAMESPACE = "urn:x-cast:com.videoparty.cast";
+
+      const context = cast.framework.CastReceiverContext.getInstance();
+
+      let player = null; // YT.Player, created on the first play
+      let ytReady = false;
+      // A play request that arrived before the IFrame API finished loading.
+      let pendingVideoId = null;
+
+      function showIdle(message) {
+        document.getElementById("idle-message").textContent = message;
+        document.getElementById("idle").classList.remove("hidden");
+      }
+
+      function showPlayer() {
+        document.getElementById("idle").classList.add("hidden");
+      }
+
+      // Tells every connected sender where playback stands; the phone uses
+      // it to reflect state and to surface non-embeddable videos.
+      function broadcast(status) {
+        context.sendCustomMessage(NAMESPACE, undefined, status);
+      }
+
+      function play(videoId) {
+        if (!ytReady) {
+          pendingVideoId = videoId;
+          return;
+        }
+        showPlayer();
+        if (player) {
+          player.loadVideoById(videoId);
+          return;
+        }
+        player = new YT.Player("player", {
+          videoId,
+          playerVars: {
+            autoplay: 1,
+            // The TV has no pointer; the phone is the only controller.
+            controls: 0,
+            rel: 0,
+          },
+          events: {
+            onReady: (event) => event.target.playVideo(),
+            onStateChange: (event) => {
+              const S = YT.PlayerState;
+              const state =
+                event.data === S.PLAYING
+                  ? "playing"
+                  : event.data === S.PAUSED
+                    ? "paused"
+                    : event.data === S.ENDED
+                      ? "ended"
+                      : event.data === S.BUFFERING
+                        ? "loading"
+                        : null;
+              if (state) {
+                broadcast({ type: "status", state });
+              }
+              if (event.data === S.ENDED) {
+                showIdle("Video ended — pick the next one on your phone.");
+              }
+            },
+            onError: (event) => {
+              // 101/150: the owner disallows embedded playback.
+              const embedBlocked = event.data === 101 || event.data === 150;
+              broadcast({
+                type: "status",
+                state: "error",
+                errorCode: event.data,
+                embedBlocked,
+              });
+              showIdle(
+                embedBlocked
+                  ? "This video can't be played on the TV (embedding disabled)."
+                  : "This video failed to play (error " + event.data + ")."
+              );
+            },
+          },
+        });
+      }
+
+      // The global hook the IFrame API script calls once it has loaded.
+      function onYouTubeIframeAPIReady() {
+        ytReady = true;
+        if (pendingVideoId) {
+          const videoId = pendingVideoId;
+          pendingVideoId = null;
+          play(videoId);
+        }
+      }
+
+      context.addCustomMessageListener(NAMESPACE, (event) => {
+        const message = event.data;
+        switch (message.type) {
+          case "play":
+            play(message.videoId);
+            break;
+          case "pause":
+            player?.pauseVideo();
+            break;
+          case "resume":
+            player?.playVideo();
+            break;
+          case "stop":
+            player?.stopVideo();
+            showIdle("Ready — pick a video on your phone.");
+            broadcast({ type: "status", state: "idle" });
+            break;
+        }
+      });
+
+      context.start(
+        // No CAF media pipeline is used (YouTube plays inside the iframe),
+        // so CAF must not kill the session for media inactivity.
+        new cast.framework.CastReceiverOptions({ disableIdleTimeout: true })
+      );
+    </script>
+  </body>
+</html>
