@@ -45,7 +45,8 @@
         margin: 0;
         color: #9ab0c4;
       }
-      .hidden {
+      /* Must out-rank the #idle id selector, or display:flex wins. */
+      #idle.hidden {
         display: none;
       }
     </style>
