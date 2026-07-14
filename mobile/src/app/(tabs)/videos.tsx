@@ -39,13 +39,17 @@ export default function VideosScreen() {
   // to the TV. Guests never see the cast UI.
   const isOrganizer = activeParty?.role === 'organizer';
   const [castError, setCastError] = useState<string | null>(null);
+  // What the receiver last reported; drives the Play/Stop toggle.
+  const [tvState, setTvState] = useState<CastStatus['state']>('idle');
   // Non-null only while a cast session is connected; also how the receiver
-  // reports playback failures (most importantly embed-blocked videos).
+  // reports playback state and failures (most importantly embed-blocked
+  // videos).
   const castChannel = useCastChannel(
     CAST_NAMESPACE,
     useCallback((message: Record<string, any> | string) => {
       if (typeof message === 'string' || message.type !== 'status') return;
       const status = message as CastStatus;
+      setTvState(status.state);
       if (status.state === 'error') {
         setCastError(
           status.embedBlocked
@@ -56,11 +60,24 @@ export default function VideosScreen() {
     }, [])
   );
 
-  const playOnTv = (url: string) => {
-    const videoId = extractYouTubeVideoId(url);
-    if (!videoId || !castChannel) return;
+  // The single TV control plays the top of the playlist; everything below
+  // it is queue. Stop covers loading too, so a mis-tap is cancelable.
+  const topVideoId = videos.length
+    ? extractYouTubeVideoId(videos[0].url)
+    : null;
+  const tvPlaying =
+    tvState === 'playing' || tvState === 'loading' || tvState === 'paused';
+
+  const toggleTv = () => {
+    if (!castChannel) return;
+    if (tvPlaying) {
+      const command: CastCommand = { type: 'stop' };
+      castChannel.sendMessage(command);
+      return;
+    }
+    if (!topVideoId) return;
     setCastError(null);
-    const command: CastCommand = { type: 'play', videoId };
+    const command: CastCommand = { type: 'play', videoId: topVideoId };
     castChannel.sendMessage(command);
   };
 
@@ -170,7 +187,16 @@ export default function VideosScreen() {
                 Could not add the video: {addVideoError}
               </ThemedText>
             )}
-            <ThemedText type="subtitle">Playlist</ThemedText>
+            <ThemedView style={styles.playlistRow}>
+              <ThemedText type="subtitle">Playlist</ThemedText>
+              {castChannel && (tvPlaying || topVideoId) && (
+                <Pressable onPress={toggleTv} hitSlop={Spacing.two}>
+                  <ThemedText type="smallBold" style={styles.playOnTv}>
+                    {tvPlaying ? '■ Stop' : '▶ Play on TV'}
+                  </ThemedText>
+                </Pressable>
+              )}
+            </ThemedView>
           </ThemedView>
         }
         renderItem={({ item }) => (
@@ -196,16 +222,6 @@ export default function VideosScreen() {
                   added by {addedBy(item.addedByUserId)}
                 </ThemedText>
               </ThemedView>
-              {castChannel && extractYouTubeVideoId(item.url) && (
-                <Pressable
-                  onPress={() => playOnTv(item.url)}
-                  hitSlop={Spacing.two}
-                >
-                  <ThemedText type="smallBold" style={styles.playOnTv}>
-                    ▶ TV
-                  </ThemedText>
-                </Pressable>
-              )}
             </ThemedView>
           </Pressable>
         )}
@@ -261,6 +277,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     alignSelf: 'center',
+  },
+  playlistRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   playOnTv: {
     // Same accent as the Add Video button.
