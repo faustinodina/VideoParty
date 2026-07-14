@@ -1,17 +1,5 @@
 # History
 
-## 7/14/2026
-
-### Casting verified end-to-end — a party video plays on the TV, controlled from the phone
-
-Yesterday's Chromecast feature was committed but never actually cast. Getting to a playing video today meant clearing three unrelated problems, each of which was hiding the next:
-
-- The receiver server was serving the wrong directory. `npx serve receiver -l 8090` had been started from outside the repo root, so `receiver/` didn't resolve to our folder and every request — including the Streamer's — got serve's own 404 page. It must be run from the repo root; verified afterwards by fetching the page from the phone over Wi-Fi.
-- The Streamer was registered with the wrong serial number. Android TV devices have a separate software (Cast) serial — found via developer mode under Settings → System → Cast, or by casting cast.google.com/publish from Chrome, which reads it aloud — and that's the one the Cast console needs, not the hardware serial. The console misleadingly shows "Ready for Testing" either way; the device itself kept answering APP_UNAVAILABLE until the right serial was registered and it was power-cycled. Diagnosed by speaking the CASTV2 protocol to the Streamer directly from the PC (TLS on 8009, GET_APP_AVAILABILITY / LAUNCH), which gives a seconds-fast yes/no without involving the phone.
-- The idle screen never got out of the way. First real cast played audio behind a stuck idle screen: `.hidden { display: none }` loses the specificity fight against `#idle { display: flex }`, so the class the code toggled had no effect. Fixed as `#idle.hidden` — the one code change to come out of testing.
-
-Also learned, and worth remembering: the router delivers mDNS to the phone only intermittently (wire capture showed devices answering a wired PC instantly while the phone misses the responses), so any cast picker — YouTube's included — sometimes comes up empty. Reopening the picker retries the scan; the durable fix would be router-side (IGMP snooping / multicast settings).
-
 ## 7/11/2026
 
 ### The PartyVideo entity is in place and the PartyVideos table now exists in the dev database
@@ -105,3 +93,15 @@ Done so far:
   sends the video to the receiver. Receiver-reported errors surface as a red line under the header. Typecheck and lint pass.
 - Setup guide (receiver/README.md) — the one-time steps only you can do: the $5 Cast console registration, serving receiver/ on your LAN, registering the Streamer's serial, and swapping the real app ID into
   app.json.
+
+### Casting is fully working. To recap what stood between yesterday's commit and a playing video — three unrelated problems, each masking the next
+
+1. The receiver server was serving the wrong directory — serve receiver had been started outside the repo root, so everything got 404s. Restarted from the repo root.
+2. The wrong serial number was registered — Android TV devices like the Streamer need their software (Cast) serial, not the hardware one; the console misleadingly still said "Ready for Testing." Your 0/O
+   re-check fixed it, confirmed by probing the Streamer directly over the Cast protocol.
+3. A CSS specificity bug in the receiver page — .hidden couldn't beat #idle's display: flex, so the idle screen sat on top of the playing video. Fixed as #idle.hidden.
+
+Along the way we also established that your router delivers mDNS to the phone only intermittently — that's why cast pickers (even YouTube's) sometimes come up empty. Reopening the picker retries the scan; if
+it annoys you long-term, look at the router's IGMP-snooping/multicast settings. All of this is saved in my notes for future sessions.
+
+Committed as 76a1d70
