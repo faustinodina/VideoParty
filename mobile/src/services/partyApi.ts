@@ -166,6 +166,14 @@ export function addVideo(partyId: string, url: string): Promise<PartyVideo> {
   return post<PartyVideo>(`/VP/parties/${partyId}/videos`, { url });
 }
 
+// Organizer or the video's adder on the API side.
+export function removeVideo(
+  partyId: string,
+  partyVideoId: string
+): Promise<void> {
+  return del(`/VP/parties/${partyId}/videos/${partyVideoId}`);
+}
+
 // The caller removes themself from the party. Rejected for the organizer.
 export function leaveParty(partyId: string): Promise<void> {
   return del(`/VP/parties/${partyId}/members/me`);

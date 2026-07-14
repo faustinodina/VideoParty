@@ -12,6 +12,7 @@ import {
   PartyVideo,
   registerMember,
   removeMember as removeMemberApi,
+  removeVideo as removeVideoApi,
 } from "@/services/partyApi";
 import signalR from "@/services/signalRService";
 import { getUserName } from "@/services/userIdentity";
@@ -136,6 +137,18 @@ export const removeMember = createAsyncThunk(
   }
 );
 
+// Removes a video from the active party's playlist — dispatched when the
+// top video finishes playing on the TV (see the Videos tab). The API
+// broadcasts VideoRemoved to the party group, but the fulfilled reducer
+// also removes it locally so the advance does not wait for the echo.
+export const removeVideo = createAsyncThunk(
+  "party/removeVideo",
+  async (video: PartyVideo) => {
+    await removeVideoApi(video.partyId, video.partyVideoId);
+    return video;
+  }
+);
+
 // A guest abandons a party. The API broadcasts MemberRemoved (echoed back
 // to this device too, harmlessly), but the fulfilled reducer cleans up
 // locally so leaving works even if that echo is missed.
@@ -239,6 +252,20 @@ const partySlice = createSlice({
         insertVideo(state.videos, action.payload);
       }
     },
+    // Dispatched from the app-level SignalR subscription when a video is
+    // removed from the open party. Filtering is idempotent, so the
+    // organizer receiving the echo of their own removal is harmless.
+    videoRemoved(state, action: PayloadAction<PartyVideo>) {
+      if (
+        state.activePartyId &&
+        action.payload.partyId.toLowerCase() ===
+          state.activePartyId.toLowerCase()
+      ) {
+        state.videos = state.videos.filter(
+          (v) => v.partyVideoId !== action.payload.partyVideoId
+        );
+      }
+    },
     // Add Video is about to open YouTube for this party: remember it so the
     // link that comes back through the share sheet is posted to it, whatever
     // party happens to be open by then.
@@ -323,6 +350,11 @@ const partySlice = createSlice({
           (m) => m.partyMemberId !== action.payload.partyMemberId
         );
       })
+      .addCase(removeVideo.fulfilled, (state, action) => {
+        state.videos = state.videos.filter(
+          (v) => v.partyVideoId !== action.payload.partyVideoId
+        );
+      })
       .addCase(leaveParty.fulfilled, (state, action) => {
         // Same cleanup as removedFromParty: drop the party and close it if
         // it is the one currently open.
@@ -382,6 +414,7 @@ export const {
   memberRemoved,
   removedFromParty,
   videoAdded,
+  videoRemoved,
   videoRequested,
   videoShared,
 } = partySlice.actions;

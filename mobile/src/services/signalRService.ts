@@ -125,6 +125,14 @@ class SignalRService {
     return () => this.off("VideoAdded", callback);
   }
 
+  // Broadcast by the API when a video is removed from the playlist (most
+  // commonly the top one finishing on the TV); the payload is the removed
+  // video, same PartyVideo shape as VideoAdded.
+  onVideoRemoved(callback: (video: PartyVideo) => void) {
+    this.on("VideoRemoved", callback);
+    return () => this.off("VideoRemoved", callback);
+  }
+
   async disconnect() {
     await this.connection?.stop();
 

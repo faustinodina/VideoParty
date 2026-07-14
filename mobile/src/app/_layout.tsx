@@ -25,6 +25,7 @@ import {
   memberRemoved,
   removedFromParty,
   videoAdded,
+  videoRemoved,
   videoShared,
 } from "@/store/partySlice";
 
@@ -83,6 +84,10 @@ export default function RootLayout() {
       store.dispatch(videoAdded(video));
     });
 
+    const unsubscribeVideoRemoved = signalR.onVideoRemoved((video) => {
+      store.dispatch(videoRemoved(video));
+    });
+
     const unsubscribeRemoved = signalR.onMemberRemoved(async (member) => {
       // Being removed yourself closes the party; anyone else just leaves
       // the members list.
@@ -116,6 +121,7 @@ export default function RootLayout() {
     return () => {
       unsubscribeJoined();
       unsubscribeVideoAdded();
+      unsubscribeVideoRemoved();
       unsubscribeRemoved();
       unsubscribeReset();
       signalR.disconnect();

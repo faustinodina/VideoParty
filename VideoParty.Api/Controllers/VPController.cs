@@ -418,6 +418,51 @@ namespace VideoParty.Api.Controllers
       return CreatedAtAction(nameof(GetVideo), new { partyId = partyId, id = video.PartyVideoId }, video);
     }
 
+    // The organizer (whose phone removes the top video as it finishes
+    // playing on the TV) or the member who added the video may remove it.
+    [HttpDelete("parties/{partyId:guid}/videos/{id:guid}")]
+    public async Task<IActionResult> RemoveVideo(Guid partyId, Guid id)
+    {
+      var party = await _db.Parties.FindAsync(partyId);
+      if (party is null)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      var video = await _db.PartyVideos
+          .FirstOrDefaultAsync(v => v.PartyId == partyId && v.PartyVideoId == id);
+      if (video is null)
+      {
+        return NotFound($"Video '{id}' was not found in party '{partyId}'.");
+      }
+
+      var userId = CallerUserId;
+      if (party.OrganizerUserId != userId && video.AddedByUserId != userId)
+      {
+        return StatusCode(StatusCodes.Status403Forbidden,
+            "Only the organizer or the member who added a video can remove it.");
+      }
+
+      _db.PartyVideos.Remove(video);
+      await _db.SaveChangesAsync();
+
+      // Same shape as VideoAdded so clients reuse the PartyVideo type.
+      await _hub.Clients.Group(partyId.ToString()).SendAsync("VideoRemoved", new
+      {
+        video.PartyVideoId,
+        video.PartyId,
+        video.AddedByUserId,
+        video.Url,
+        video.Title,
+        video.ThumbnailUrl,
+        video.Position,
+        video.CreatedAt,
+        video.UpdatedAt
+      });
+
+      return NoContent();
+    }
+
     // Only the party's organizer may remove members.
     [HttpDelete("parties/{partyId:guid}/members/{id:guid}")]
     public async Task<IActionResult> RemoveMember(Guid partyId, Guid id)

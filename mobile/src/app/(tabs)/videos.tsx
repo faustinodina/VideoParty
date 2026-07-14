@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet } from 'react-native';
 import { CastButton, useCastChannel } from 'react-native-google-cast';
 
@@ -18,6 +18,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   addPendingVideo,
   clearPendingVideo,
+  removeVideo,
   selectActiveParty,
   videoRequested,
 } from '@/store/partySlice';
@@ -41,24 +42,54 @@ export default function VideosScreen() {
   const [castError, setCastError] = useState<string | null>(null);
   // What the receiver last reported; drives the Play/Stop toggle.
   const [tvState, setTvState] = useState<CastStatus['state']>('idle');
+  // The channel callback below is created once, so it reads the playlist
+  // and the channel itself through refs to see their current values.
+  const videosRef = useRef(videos);
+  const channelRef = useRef<ReturnType<typeof useCastChannel>>(null);
+
   // Non-null only while a cast session is connected; also how the receiver
   // reports playback state and failures (most importantly embed-blocked
   // videos).
   const castChannel = useCastChannel(
     CAST_NAMESPACE,
-    useCallback((message: Record<string, any> | string) => {
-      if (typeof message === 'string' || message.type !== 'status') return;
-      const status = message as CastStatus;
-      setTvState(status.state);
-      if (status.state === 'error') {
-        setCastError(
-          status.embedBlocked
-            ? "This video can't play on the TV: its owner disabled embedding. It still plays in YouTube."
-            : `The TV could not play this video (error ${status.errorCode}).`
-        );
-      }
-    }, [])
+    useCallback(
+      (message: Record<string, any> | string) => {
+        if (typeof message === 'string' || message.type !== 'status') return;
+        const status = message as CastStatus;
+        setTvState(status.state);
+        if (status.state === 'error') {
+          setCastError(
+            status.embedBlocked
+              ? "This video can't play on the TV: its owner disabled embedding. It still plays in YouTube."
+              : `The TV could not play this video (error ${status.errorCode}).`
+          );
+        }
+        if (status.state === 'ended') {
+          // Auto-advance: the finished top video leaves the playlist (for
+          // every member, via removeVideo) and the next castable one
+          // starts. Only the organizer's phone has a cast session, so no
+          // one else issues the removal.
+          const [ended, next] = videosRef.current;
+          if (!ended) return;
+          dispatch(removeVideo(ended));
+          const nextId = next ? extractYouTubeVideoId(next.url) : null;
+          if (nextId && channelRef.current) {
+            setCastError(null);
+            const command: CastCommand = { type: 'play', videoId: nextId };
+            channelRef.current.sendMessage(command);
+            setTvState('loading');
+          }
+        }
+      },
+      [dispatch]
+    )
   );
+
+  // Keep the refs the once-created channel callback reads in sync.
+  useEffect(() => {
+    videosRef.current = videos;
+    channelRef.current = castChannel;
+  });
 
   // The single TV control plays the top of the playlist; everything below
   // it is queue. Stop covers loading too, so a mis-tap is cancelable.
