@@ -89,6 +89,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Serves the Cast receiver page from wwwroot: the Streamer fetches
+// /receiver/ at the start of every cast session (URL registered in the Cast
+// console). UseDefaultFiles rewrites the directory URL to index.html.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

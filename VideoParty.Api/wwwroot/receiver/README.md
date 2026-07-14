@@ -14,19 +14,22 @@ the start of every cast session from the URL registered in the Cast console.
    [Google Cast SDK Developer Console](https://cast.google.com/publish)
    (one-time $5 fee).
 2. **Serve this page on the LAN** (the Streamer fetches it, so it must be
-   reachable from the Streamer, not just from this PC):
+   reachable from the Streamer, not just from this PC): the API server does
+   this — the page lives in its `wwwroot`, so running the API is enough.
 
-   ```
-   npx serve receiver -l 8090
-   ```
-
-   The receiver URL is then `http://<your-pc-lan-ip>:8090/`. Plain HTTP is
-   fine while the receiver is unpublished.
+   The receiver URL is then `http://<your-pc-lan-ip>:5070/receiver/`. Plain
+   HTTP is fine while the receiver is unpublished.
 3. **Add a "Custom Receiver"** in the console with that URL. You get back an
    **Application ID** (e.g. `A1B2C3D4`).
 4. **Register the Streamer for development**: console → "Cast Receiver
-   Devices" → add the device's serial number (Google TV: Settings → System →
-   About). Activation can take ~15 minutes and needs a device reboot.
+   Devices" → add the device's **software (Cast) serial number** — NOT the
+   hardware serial from Settings → System → About or the box. Find it by
+   enabling developer mode (About → click "Android TV OS build" repeatedly),
+   then Settings → System → Cast; or cast cast.google.com/publish from
+   Chrome, which shows it on the TV and reads it aloud. Activation takes
+   ~15 minutes, then power-cycle the device. The console shows "Ready for
+   Testing" even for a wrong serial, so a device that answers
+   APP_UNAVAILABLE most likely has the wrong serial registered.
 5. **Put the Application ID in the app**: in `mobile/app.json`, replace the
    placeholder under the `react-native-google-cast` plugin:
 
