@@ -121,3 +121,13 @@ When the receiver reports the top video ended, the organizer's phone deletes it 
 Committed as 0856af5
 
 ### Manual video removal for organizers
+
+### Keep transient SignalR drops out of the dev error overlay
+
+When "Add Video" is clicked YouTube is opened causing the VP app to go to the background.
+That causes the SignalR WebSocket to get disconnected.
+That results (in dev mode) in an error being logged (by SignalR)
+The disconnection is automatically fixed by SignalR, but the log is displayed.
+The fix is to redirect the SignalR log to the console(?)
+
+Committed as 9800654
