@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Linking, StyleSheet, View } from 'react-native';
-import { CastButton, useCastChannel } from 'react-native-google-cast';
+import CastContext, { useCastChannel } from 'react-native-google-cast';
 import {
   Button,
   Card,
@@ -201,10 +201,16 @@ export default function VideosScreen() {
                 Add Video
               </Button>
               {isOrganizer && (
-                <CastButton
-                  style={styles.castButton}
-                  tintColor={theme.colors.onSurface}
-                />
+                // The native CastButton is a bare icon; a Paper button
+                // matching Add Video opens the same route dialog, which
+                // also handles disconnecting.
+                <Button
+                  mode="contained"
+                  icon={castChannel ? 'cast-connected' : 'cast'}
+                  onPress={() => CastContext.showCastDialog()}
+                >
+                  {castChannel ? 'TV Connected' : 'Connect TV'}
+                </Button>
               )}
             </View>
             {castError && (
@@ -247,8 +253,7 @@ export default function VideosScreen() {
               <Text variant="titleMedium">Playlist</Text>
               {castChannel && (tvPlaying || topVideoId) && (
                 <Button
-                  compact
-                  mode="text"
+                  mode="contained"
                   icon={tvPlaying ? 'stop' : 'play'}
                   onPress={toggleTv}
                 >
@@ -330,11 +335,6 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: Spacing.three,
-  },
-  castButton: {
-    width: 40,
-    height: 40,
-    alignSelf: 'center',
   },
   playlistRow: {
     flexDirection: 'row',
