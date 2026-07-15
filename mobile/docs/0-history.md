@@ -105,3 +105,19 @@ Along the way we also established that your router delivers mDNS to the phone on
 it annoys you long-term, look at the router's IGMP-snooping/multicast settings. All of this is saved in my notes for future sessions.
 
 Committed as 76a1d70
+
+### Cast receiver page moved to api server
+
+The Cast receiver page is now served by the API server. receiver/ moved to VideoParty.Api/wwwroot/receiver/ and Program.cs gained static-file middleware, so the page is at http://<lan-ip>:5070/receiver/ and the separate npx serve process is gone — running the API is the whole casting setup now.
+
+### The playlist now has a single TV control
+
+The per-video "▶ TV" buttons are gone; a "▶ Play on TV" action on the Playlist heading plays the video at the top of the list, and flips to "■ Stop" while the TV is loading or playing (driven by the receiver's status broadcasts, so it resets on its own when a video ends or fails). It still appears only during a cast session, and only offers Play when the top video is a YouTube link.
+
+### The playlist now advances itself as videos finish on the TV
+
+When the receiver reports the top video ended, the organizer's phone deletes it through a new DELETE /VP/parties/{partyId}/videos/{id} endpoint (allowed for the organizer or the video's adder) and immediately casts the next YouTube video in the list. The API broadcasts VideoRemoved (same shape as VideoAdded), which every member's app bridges into its store — so played videos vanish live from everyone's playlist, and guests who join later never see them at all because the rows are gone from the database. The chain continues until the playlist is empty or the next entry isn't castable (non-YouTube link), at which point the TV returns to the idle screen. Interrupted playback (Stop, or a dropped session) doesn't count as played — the video stays at the top and restarts from the beginning next time.
+
+Committed as 0856af5
+
+### Manual video removal for organizers

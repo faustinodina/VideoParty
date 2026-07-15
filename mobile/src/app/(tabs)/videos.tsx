@@ -46,6 +46,10 @@ export default function VideosScreen() {
   // and the channel itself through refs to see their current values.
   const videosRef = useRef(videos);
   const channelRef = useRef<ReturnType<typeof useCastChannel>>(null);
+  // The id of the video the TV is playing. Not simply the top of the list:
+  // the organizer can remove any row — including the playing one — while
+  // it plays, so what ended must be identified, not assumed.
+  const playingIdRef = useRef<string | null>(null);
 
   // Non-null only while a cast session is connected; also how the receiver
   // reports playback state and failures (most importantly embed-blocked
@@ -65,19 +69,31 @@ export default function VideosScreen() {
           );
         }
         if (status.state === 'ended') {
-          // Auto-advance: the finished top video leaves the playlist (for
+          // Auto-advance: the finished video leaves the playlist (for
           // every member, via removeVideo) and the next castable one
           // starts. Only the organizer's phone has a cast session, so no
-          // one else issues the removal.
-          const [ended, next] = videosRef.current;
-          if (!ended) return;
-          dispatch(removeVideo(ended));
+          // one else issues the removal. The finished video is usually the
+          // top of the list, but may already be gone (removed manually
+          // while it played), in which case there is nothing to delete.
+          const list = videosRef.current;
+          const ended = list.find(
+            (v) => v.partyVideoId === playingIdRef.current
+          );
+          if (ended) {
+            dispatch(removeVideo(ended));
+          }
+          const next = list.find(
+            (v) => v.partyVideoId !== playingIdRef.current
+          );
           const nextId = next ? extractYouTubeVideoId(next.url) : null;
-          if (nextId && channelRef.current) {
+          if (next && nextId && channelRef.current) {
             setCastError(null);
             const command: CastCommand = { type: 'play', videoId: nextId };
             channelRef.current.sendMessage(command);
+            playingIdRef.current = next.partyVideoId;
             setTvState('loading');
+          } else {
+            playingIdRef.current = null;
           }
         }
       },
@@ -104,12 +120,14 @@ export default function VideosScreen() {
     if (tvPlaying) {
       const command: CastCommand = { type: 'stop' };
       castChannel.sendMessage(command);
+      playingIdRef.current = null;
       return;
     }
     if (!topVideoId) return;
     setCastError(null);
     const command: CastCommand = { type: 'play', videoId: topVideoId };
     castChannel.sendMessage(command);
+    playingIdRef.current = videos[0].partyVideoId;
   };
 
   // Opens the YouTube app when installed; otherwise the website. openURL
@@ -253,6 +271,16 @@ export default function VideosScreen() {
                   added by {addedBy(item.addedByUserId)}
                 </ThemedText>
               </ThemedView>
+              {isOrganizer && (
+                <Pressable
+                  onPress={() => dispatch(removeVideo(item))}
+                  hitSlop={Spacing.two}
+                >
+                  <ThemedText type="small" themeColor="danger">
+                    Remove
+                  </ThemedText>
+                </Pressable>
+              )}
             </ThemedView>
           </Pressable>
         )}
