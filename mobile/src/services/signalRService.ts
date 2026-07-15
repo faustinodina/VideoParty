@@ -1,12 +1,25 @@
 import {
   HubConnection,
   HubConnectionBuilder,
+  ILogger,
   LogLevel,
 } from "@microsoft/signalr";
 
 import { HUB_URL } from "@/constants/config";
 import type { PartyMember, PartyVideo } from "@/services/partyApi";
 import { getAccessToken } from "@/services/userIdentity";
+
+// The library logs transient websocket drops via console.error, which LogBox
+// turns into a full-screen error in dev builds — even though automatic
+// reconnection recovers moments later. Route everything through console.log
+// so expected disconnects inform instead of alarm.
+const logger: ILogger = {
+  log(logLevel: LogLevel, message: string) {
+    if (logLevel >= LogLevel.Information) {
+      console.log(message);
+    }
+  },
+};
 
 class SignalRService {
   private connection: HubConnection | null = null;
@@ -26,7 +39,7 @@ class SignalRService {
         accessTokenFactory: () => getAccessToken(),
       })
       .withAutomaticReconnect()
-      .configureLogging(LogLevel.Information)
+      .configureLogging(logger)
       .build();
 
     for (const [event, callback] of this.handlers) {
