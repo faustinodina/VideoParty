@@ -1,19 +1,17 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { Alert, FlatList, Platform, Share, StyleSheet, View } from 'react-native';
 import {
-  Alert,
-  FlatList,
-  Platform,
-  Pressable,
-  Share,
-  StyleSheet,
-} from 'react-native';
+  Button,
+  Card,
+  Chip,
+  IconButton,
+  Text,
+  useTheme,
+} from 'react-native-paper';
 
 import AppHeader from '@/components/app-header';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -98,107 +96,111 @@ export default function PartyScreen() {
 
   if (!activeParty) {
     return (
-      <ThemedView style={styles.screen}>
+      <View
+        style={[styles.screen, { backgroundColor: theme.colors.background }]}
+      >
         <AppHeader />
-        <ThemedView style={styles.placeholder}>
-          <ThemedText themeColor="textSecondary" style={styles.empty}>
+        <View style={styles.placeholder}>
+          <Text
+            variant="bodyMedium"
+            style={[styles.empty, { color: theme.colors.onSurfaceVariant }]}
+          >
             Open a party from the Parties tab to see it here.
-          </ThemedText>
-        </ThemedView>
-      </ThemedView>
+          </Text>
+        </View>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={styles.screen}>
+    <View
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
+    >
       <AppHeader />
       <FlatList
-        style={[styles.list, { backgroundColor: theme.background }]}
+        style={styles.list}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         data={members}
         keyExtractor={(item) => item.partyMemberId}
         ListHeaderComponent={
-          <ThemedView style={styles.header}>
-            <ThemedText type="title">{activeParty.name}</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
+          <View style={styles.header}>
+            <Text variant="headlineMedium">{activeParty.name}</Text>
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
               You are {activeParty.role === 'organizer' ? 'the organizer' : 'a guest'} of
               this party.
               {activeParty.role === 'organizer' &&
                 ' Each Share Party invite admits one guest.'}
-            </ThemedText>
-            <ThemedView style={styles.actionRow}>
+            </Text>
+            <View style={styles.actionRow}>
               {activeParty.role === 'organizer' ? (
-                <Pressable
+                <Button
+                  mode="contained"
+                  icon="share-variant"
                   onPress={shareParty}
-                  style={({ pressed }) => [
-                    styles.shareButton,
-                    pressed && styles.pressed,
-                  ]}
                 >
-                  <ThemedText type="smallBold" style={styles.shareButtonLabel}>
-                    Share Party
-                  </ThemedText>
-                </Pressable>
+                  Share Party
+                </Button>
               ) : (
-                <Pressable
+                <Button
+                  mode="contained"
+                  icon="logout"
+                  buttonColor={theme.colors.error}
+                  textColor={theme.colors.onError}
                   onPress={exitParty}
-                  style={({ pressed }) => [
-                    styles.leaveButton,
-                    pressed && styles.pressed,
-                  ]}
                 >
-                  <ThemedText type="smallBold" style={styles.shareButtonLabel}>
-                    Leave Party
-                  </ThemedText>
-                </Pressable>
+                  Leave Party
+                </Button>
               )}
-            </ThemedView>
+            </View>
             {copiedInvite && (
-              <ThemedText type="small" themeColor="textSecondary">
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 Invitation copied to the clipboard.
-              </ThemedText>
+              </Text>
             )}
             {shareError && (
-              <ThemedText type="small" themeColor="danger">
+              <Text variant="bodySmall" style={{ color: theme.colors.error }}>
                 {shareError}
-              </ThemedText>
+              </Text>
             )}
-            <ThemedText type="subtitle">Members</ThemedText>
-          </ThemedView>
+            <Text variant="titleMedium">Members</Text>
+          </View>
         }
         renderItem={({ item }) => (
-          <ThemedView type="backgroundElement" style={styles.memberRow}>
-            <ThemedText selectable style={styles.memberName}>
-              {item.displayName}
-            </ThemedText>
-            {item.userId === activeParty.organizerUserId && (
-              <ThemedView type="backgroundSelected" style={styles.organizerBadge}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Organizer
-                </ThemedText>
-              </ThemedView>
-            )}
-            {activeParty.role === 'organizer' &&
-              item.userId !== activeParty.organizerUserId && (
-                <Pressable
-                  onPress={() => dispatch(removeMember(item))}
-                  hitSlop={Spacing.two}
-                >
-                  <ThemedText type="small" themeColor="danger">
-                    Remove
-                  </ThemedText>
-                </Pressable>
+          <Card mode="contained">
+            <View style={styles.memberRow}>
+              <Text selectable variant="titleSmall" style={styles.memberName}>
+                {item.displayName}
+              </Text>
+              {item.userId === activeParty.organizerUserId && (
+                <Chip compact>Organizer</Chip>
               )}
-          </ThemedView>
+              {activeParty.role === 'organizer' &&
+                item.userId !== activeParty.organizerUserId && (
+                  <IconButton
+                    icon="account-remove-outline"
+                    onPress={() => dispatch(removeMember(item))}
+                  />
+                )}
+            </View>
+          </Card>
         )}
         ListEmptyComponent={
-          <ThemedText themeColor="textSecondary" style={styles.empty}>
+          <Text
+            variant="bodyMedium"
+            style={[styles.empty, { color: theme.colors.onSurfaceVariant }]}
+          >
             No members yet. New joins will appear here in real time.
-          </ThemedText>
+          </Text>
         }
       />
-    </ThemedView>
+    </View>
   );
 }
 
@@ -230,42 +232,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.three,
   },
-  shareButton: {
-    backgroundColor: '#208AEF',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-    alignSelf: 'flex-start',
-  },
-  shareButtonLabel: {
-    color: '#ffffff',
-  },
-  leaveButton: {
-    backgroundColor: '#d93025',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-    alignSelf: 'flex-start',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.two,
-    borderCurve: 'continuous',
+    paddingVertical: Spacing.two,
   },
   memberName: {
     flex: 1,
-  },
-  organizerBadge: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-    borderRadius: Spacing.two,
   },
   empty: {
     textAlign: 'center',

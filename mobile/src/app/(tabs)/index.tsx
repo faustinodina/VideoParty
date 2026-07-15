@@ -1,16 +1,21 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, TextInput } from "react-native";
+import { Alert, FlatList, StyleSheet, View } from "react-native";
+import {
+  Button,
+  Card,
+  Chip,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
 
 import AppHeader from "@/components/app-header";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import {
   BottomTabInset,
   MaxContentWidth,
   Spacing,
 } from "@/constants/theme";
-import { useTheme } from "@/hooks/use-theme";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   createParty,
@@ -108,16 +113,13 @@ export default function PartiesScreen() {
     );
   };
 
-  const inputStyle = [
-    styles.input,
-    { color: theme.text, backgroundColor: theme.backgroundElement },
-  ];
-
   return (
-    <ThemedView style={styles.screen}>
+    <View
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
+    >
       <AppHeader />
       <FlatList
-        style={[styles.list, { backgroundColor: theme.background }]}
+        style={styles.list}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         data={parties}
@@ -125,162 +127,127 @@ export default function PartiesScreen() {
         refreshing={loadingParties}
         onRefresh={() => dispatch(fetchParties())}
         ListHeaderComponent={
-          <ThemedView style={styles.header}>
-            <ThemedText type="title">Parties</ThemedText>
+          <View style={styles.header}>
+            <Text variant="headlineMedium">Parties</Text>
 
-            <ThemedView style={styles.actionRow}>
-              <ActionButton
-                label="Create Party"
-                active={formMode === "create"}
+            <View style={styles.actionRow}>
+              <Button
+                mode={formMode === "create" ? "outlined" : "contained"}
+                icon="plus"
                 onPress={() =>
                   setFormMode(formMode === "create" ? "none" : "create")
                 }
-              />
-              <ActionButton
-                label="Join Party"
-                active={formMode === "join"}
-                onPress={() => setFormMode(formMode === "join" ? "none" : "join")}
-              />
-            </ThemedView>
+              >
+                {formMode === "create" ? "Cancel" : "Create Party"}
+              </Button>
+              <Button
+                mode={formMode === "join" ? "outlined" : "contained"}
+                icon="account-plus"
+                onPress={() =>
+                  setFormMode(formMode === "join" ? "none" : "join")
+                }
+              >
+                {formMode === "join" ? "Cancel" : "Join Party"}
+              </Button>
+            </View>
 
             {formMode === "create" && (
-              <ThemedView style={styles.form}>
+              <View style={styles.form}>
                 <TextInput
+                  mode="outlined"
+                  dense
+                  label="Party name"
                   value={partyName}
                   onChangeText={setPartyName}
-                  placeholder="Party name"
-                  placeholderTextColor={theme.textSecondary}
                   autoFocus
-                  style={inputStyle}
                   onSubmitEditing={submitCreate}
                 />
-                <SubmitButton
-                  label={creating ? "Creating…" : "Create"}
-                  disabled={creating}
+                <Button
+                  mode="contained"
                   onPress={submitCreate}
-                />
+                  loading={creating}
+                  disabled={creating}
+                >
+                  Create
+                </Button>
                 {createError && <ErrorText message={createError} />}
-              </ThemedView>
+              </View>
             )}
 
             {formMode === "join" && (
-              <ThemedView style={styles.form}>
+              <View style={styles.form}>
                 <TextInput
+                  mode="outlined"
+                  dense
+                  label="Invite code"
                   value={inviteInput}
                   onChangeText={setInviteInput}
-                  placeholder="Enter invite code"
-                  placeholderTextColor={theme.textSecondary}
                   autoCapitalize="characters"
                   autoCorrect={false}
                   autoFocus
-                  style={inputStyle}
                   onSubmitEditing={submitJoin}
                 />
-                <SubmitButton
-                  label={joining ? "Joining…" : "Join"}
-                  disabled={joining}
+                <Button
+                  mode="contained"
                   onPress={submitJoin}
-                />
+                  loading={joining}
+                  disabled={joining}
+                >
+                  Join
+                </Button>
                 {(inviteError ?? joinError) && (
                   <ErrorText message={(inviteError ?? joinError)!} />
                 )}
-              </ThemedView>
+              </View>
             )}
 
             {partiesError && <ErrorText message={partiesError} />}
-          </ThemedView>
+          </View>
         }
         renderItem={({ item }) => (
-          <Pressable
-            onPress={() => openExisting(item.partyId)}
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <ThemedView type="backgroundElement" style={styles.partyRow}>
-              <ThemedText style={styles.partyName} numberOfLines={1}>
+          <Card mode="contained" onPress={() => openExisting(item.partyId)}>
+            <View style={styles.partyRow}>
+              <Text variant="titleSmall" style={styles.partyName} numberOfLines={1}>
                 {item.name}
-              </ThemedText>
-              <ThemedView type="backgroundSelected" style={styles.roleBadge}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {item.role === "organizer" ? "Organizer" : "Guest"}
-                </ThemedText>
-              </ThemedView>
+              </Text>
+              <Chip compact>
+                {item.role === "organizer" ? "Organizer" : "Guest"}
+              </Chip>
               {item.role === "guest" && (
-                <Pressable
+                <Button
+                  compact
+                  mode="text"
+                  textColor={theme.colors.error}
                   onPress={() => confirmLeave(item.partyId, item.name)}
-                  hitSlop={Spacing.two}
                 >
-                  <ThemedText type="small" themeColor="danger">
-                    Leave
-                  </ThemedText>
-                </Pressable>
+                  Leave
+                </Button>
               )}
-            </ThemedView>
-          </Pressable>
+            </View>
+          </Card>
         )}
         ListEmptyComponent={
           loadingParties ? null : (
-            <ThemedText themeColor="textSecondary" style={styles.empty}>
+            <Text
+              variant="bodyMedium"
+              style={[styles.empty, { color: theme.colors.onSurfaceVariant }]}
+            >
               No parties yet. Create one or join with an invite code.
-            </ThemedText>
+            </Text>
           )
         }
       />
-    </ThemedView>
-  );
-}
-
-function ActionButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
-    >
-      <ThemedText type="smallBold" style={styles.actionButtonLabel}>
-        {active ? "Cancel" : label}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
-function SubmitButton({
-  label,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.submitButton,
-        { backgroundColor: theme.backgroundSelected },
-        (pressed || disabled) && styles.pressed,
-      ]}
-    >
-      <ThemedText type="link">{label}</ThemedText>
-    </Pressable>
+    </View>
   );
 }
 
 function ErrorText({ message }: { message: string }) {
+  const theme = useTheme();
+
   return (
-    <ThemedText type="small" style={styles.errorText}>
+    <Text variant="bodySmall" style={{ color: theme.colors.error }}>
       {message}
-    </ThemedText>
+    </Text>
   );
 }
 
@@ -307,52 +274,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.three,
   },
-  actionButton: {
-    backgroundColor: "#208AEF",
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-  },
-  actionButtonLabel: {
-    color: "#ffffff",
-  },
   form: {
     gap: Spacing.two,
-  },
-  input: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderCurve: "continuous",
-  },
-  submitButton: {
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderCurve: "continuous",
-    alignItems: "center",
-  },
-  pressed: {
-    opacity: 0.7,
   },
   partyRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.two,
-    borderCurve: "continuous",
+    paddingVertical: Spacing.two,
   },
   partyName: {
     flex: 1,
-  },
-  roleBadge: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-    borderRadius: Spacing.two,
-  },
-  errorText: {
-    color: "#d93025",
   },
   empty: {
     textAlign: "center",

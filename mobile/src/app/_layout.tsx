@@ -11,6 +11,7 @@ import {
 } from "expo-share-intent";
 import { useEffect, useState } from "react";
 import { Alert, Platform, useColorScheme } from "react-native";
+import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
 import { Provider } from "react-redux";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
@@ -55,6 +56,30 @@ function ShareIntentHandler() {
 
   return null;
 }
+
+// Material 3 themes carrying the app's existing accent and pure black/white
+// backgrounds, so Paper screens sit next to the not-yet-converted Themed*
+// screens without a visible seam.
+const paperThemes = {
+  light: {
+    ...MD3LightTheme,
+    colors: {
+      ...MD3LightTheme.colors,
+      primary: "#208AEF",
+      onPrimary: "#ffffff",
+      background: "#ffffff",
+    },
+  },
+  dark: {
+    ...MD3DarkTheme,
+    colors: {
+      ...MD3DarkTheme.colors,
+      primary: "#208AEF",
+      onPrimary: "#ffffff",
+      background: "#000000",
+    },
+  },
+};
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -131,18 +156,24 @@ export default function RootLayout() {
   return (
     <ShareIntentProvider>
       <Provider store={store}>
-        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-          <AnimatedSplashOverlay />
-          {registered === false && (
-            <RegisterScreen onRegistered={() => setRegistered(true)} />
-          )}
-          {registered && (
-            <>
-              <ShareIntentHandler />
-              <Stack screenOptions={{ headerShown: false }} />
-            </>
-          )}
-        </ThemeProvider>
+        <PaperProvider
+          theme={colorScheme === "dark" ? paperThemes.dark : paperThemes.light}
+        >
+          <ThemeProvider
+            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+          >
+            <AnimatedSplashOverlay />
+            {registered === false && (
+              <RegisterScreen onRegistered={() => setRegistered(true)} />
+            )}
+            {registered && (
+              <>
+                <ShareIntentHandler />
+                <Stack screenOptions={{ headerShown: false }} />
+              </>
+            )}
+          </ThemeProvider>
+        </PaperProvider>
       </Provider>
     </ShareIntentProvider>
   );

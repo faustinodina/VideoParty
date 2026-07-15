@@ -1,12 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { ActivityIndicator, Button, Text, useTheme } from "react-native-paper";
 
 import AppHeader from "@/components/app-header";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
-import { useTheme } from "@/hooks/use-theme";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { joinParty } from "@/store/partySlice";
 
@@ -35,35 +33,40 @@ export default function JoinByLinkScreen() {
   }, [dispatch, code, router]);
 
   return (
-    <ThemedView style={styles.screen}>
+    <View
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
+    >
       <AppHeader />
-      <ThemedView style={styles.body}>
+      <View style={styles.body}>
         {joinError ? (
           <>
-            <ThemedText type="subtitle">Could not join</ThemedText>
-            <ThemedText themeColor="textSecondary" style={styles.centered}>
-              {joinError}
-            </ThemedText>
-            <Pressable
-              onPress={() => router.replace("/")}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && styles.pressed,
+            <Text variant="titleMedium">Could not join</Text>
+            <Text
+              variant="bodyMedium"
+              style={[
+                styles.centered,
+                { color: theme.colors.onSurfaceVariant },
               ]}
             >
-              <ThemedText type="smallBold" style={styles.backButtonLabel}>
-                Go to Parties
-              </ThemedText>
-            </Pressable>
+              {joinError}
+            </Text>
+            <Button mode="contained" onPress={() => router.replace("/")}>
+              Go to Parties
+            </Button>
           </>
         ) : (
           <>
-            <ActivityIndicator color={theme.text} />
-            <ThemedText themeColor="textSecondary">Joining party…</ThemedText>
+            <ActivityIndicator />
+            <Text
+              variant="bodyMedium"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              Joining party…
+            </Text>
           </>
         )}
-      </ThemedView>
-    </ThemedView>
+      </View>
+    </View>
   );
 }
 
@@ -80,17 +83,5 @@ const styles = StyleSheet.create({
   },
   centered: {
     textAlign: "center",
-  },
-  backButton: {
-    backgroundColor: "#208AEF",
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-  },
-  backButtonLabel: {
-    color: "#ffffff",
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

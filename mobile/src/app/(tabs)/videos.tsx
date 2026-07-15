@@ -1,13 +1,18 @@
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Linking, Pressable, StyleSheet } from 'react-native';
+import { FlatList, Linking, StyleSheet, View } from 'react-native';
 import { CastButton, useCastChannel } from 'react-native-google-cast';
+import {
+  Button,
+  Card,
+  IconButton,
+  Surface,
+  Text,
+  useTheme,
+} from 'react-native-paper';
 
 import AppHeader from '@/components/app-header';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import {
   CAST_NAMESPACE,
   CastCommand,
@@ -153,109 +158,111 @@ export default function VideosScreen() {
 
   if (!activeParty) {
     return (
-      <ThemedView style={styles.screen}>
+      <View
+        style={[styles.screen, { backgroundColor: theme.colors.background }]}
+      >
         <AppHeader />
-        <ThemedView style={styles.placeholder}>
-          <ThemedText themeColor="textSecondary" style={styles.empty}>
+        <View style={styles.placeholder}>
+          <Text
+            variant="bodyMedium"
+            style={[styles.empty, { color: theme.colors.onSurfaceVariant }]}
+          >
             Open a party from the Parties tab to see its videos here.
-          </ThemedText>
+          </Text>
           {pendingVideoUrl && (
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.empty}
+            <Text
+              variant="bodySmall"
+              style={[styles.empty, { color: theme.colors.onSurfaceVariant }]}
             >
               A video link is waiting: open a party to add it.
-            </ThemedText>
+            </Text>
           )}
-        </ThemedView>
-      </ThemedView>
+        </View>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={styles.screen}>
+    <View
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
+    >
       <AppHeader />
       <FlatList
-        style={[styles.list, { backgroundColor: theme.background }]}
+        style={styles.list}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         data={videos}
         keyExtractor={(item) => item.partyVideoId}
         ListHeaderComponent={
-          <ThemedView style={styles.header}>
-            <ThemedText type="title">{activeParty.name}</ThemedText>
-            <ThemedView style={styles.actionRow}>
-              <Pressable
-                onPress={addVideo}
-                style={({ pressed }) => [
-                  styles.addButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <ThemedText type="smallBold" style={styles.addButtonLabel}>
-                  Add Video
-                </ThemedText>
-              </Pressable>
+          <View style={styles.header}>
+            <Text variant="headlineMedium">{activeParty.name}</Text>
+            <View style={styles.actionRow}>
+              <Button mode="contained" icon="plus" onPress={addVideo}>
+                Add Video
+              </Button>
               {isOrganizer && (
-                <CastButton style={styles.castButton} tintColor={theme.text} />
+                <CastButton
+                  style={styles.castButton}
+                  tintColor={theme.colors.onSurface}
+                />
               )}
-            </ThemedView>
+            </View>
             {castError && (
-              <ThemedText type="small" themeColor="danger">
+              <Text variant="bodySmall" style={{ color: theme.colors.error }}>
                 {castError}
-              </ThemedText>
+              </Text>
             )}
             {pendingVideoUrl && (
-              <ThemedView type="backgroundElement" style={styles.pendingVideo}>
-                <ThemedText type="small" style={styles.pendingVideoUrl}>
+              <Surface mode="flat" style={styles.pendingVideo}>
+                <Text
+                  variant="bodySmall"
+                  numberOfLines={2}
+                  style={styles.pendingVideoUrl}
+                >
                   Video to add: {pendingVideoUrl}
-                </ThemedText>
-                <Pressable
+                </Text>
+                <Button
+                  compact
+                  mode="text"
                   onPress={() => dispatch(addPendingVideo())}
                   disabled={addingVideo}
-                  hitSlop={Spacing.two}
+                  loading={addingVideo}
                 >
-                  <ThemedText type="smallBold" style={styles.addAction}>
-                    {addingVideo ? 'Adding…' : 'Add'}
-                  </ThemedText>
-                </Pressable>
-                <Pressable
+                  Add
+                </Button>
+                <IconButton
+                  icon="close"
+                  size={18}
                   onPress={() => dispatch(clearPendingVideo())}
                   disabled={addingVideo}
-                  hitSlop={Spacing.two}
-                >
-                  <ThemedText type="small" themeColor="danger">
-                    Dismiss
-                  </ThemedText>
-                </Pressable>
-              </ThemedView>
+                />
+              </Surface>
             )}
             {addVideoError && (
-              <ThemedText type="small" themeColor="danger">
+              <Text variant="bodySmall" style={{ color: theme.colors.error }}>
                 Could not add the video: {addVideoError}
-              </ThemedText>
+              </Text>
             )}
-            <ThemedView style={styles.playlistRow}>
-              <ThemedText type="subtitle">Playlist</ThemedText>
+            <View style={styles.playlistRow}>
+              <Text variant="titleMedium">Playlist</Text>
               {castChannel && (tvPlaying || topVideoId) && (
-                <Pressable onPress={toggleTv} hitSlop={Spacing.two}>
-                  <ThemedText type="smallBold" style={styles.playOnTv}>
-                    {tvPlaying ? '■ Stop' : '▶ Play on TV'}
-                  </ThemedText>
-                </Pressable>
+                <Button
+                  compact
+                  mode="text"
+                  icon={tvPlaying ? 'stop' : 'play'}
+                  onPress={toggleTv}
+                >
+                  {tvPlaying ? 'Stop' : 'Play on TV'}
+                </Button>
               )}
-            </ThemedView>
-          </ThemedView>
+            </View>
+          </View>
         }
         renderItem={({ item }) => (
           // Until in-party playback exists, tapping a row opens the video
           // in YouTube.
-          <Pressable
-            onPress={() => Linking.openURL(item.url)}
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <ThemedView type="backgroundElement" style={styles.videoRow}>
+          <Card mode="contained" onPress={() => Linking.openURL(item.url)}>
+            <View style={styles.videoRow}>
               {item.thumbnailUrl && (
                 <Image
                   source={{ uri: item.thumbnailUrl }}
@@ -263,34 +270,36 @@ export default function VideosScreen() {
                   contentFit="cover"
                 />
               )}
-              <ThemedView style={styles.videoInfo}>
-                <ThemedText type="smallBold" numberOfLines={2}>
+              <View style={styles.videoInfo}>
+                <Text variant="titleSmall" numberOfLines={2}>
                   {item.title ?? item.url}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  added by {addedBy(item.addedByUserId)}
-                </ThemedText>
-              </ThemedView>
-              {isOrganizer && (
-                <Pressable
-                  onPress={() => dispatch(removeVideo(item))}
-                  hitSlop={Spacing.two}
+                </Text>
+                <Text
+                  variant="bodySmall"
+                  style={{ color: theme.colors.onSurfaceVariant }}
                 >
-                  <ThemedText type="small" themeColor="danger">
-                    Remove
-                  </ThemedText>
-                </Pressable>
+                  added by {addedBy(item.addedByUserId)}
+                </Text>
+              </View>
+              {isOrganizer && (
+                <IconButton
+                  icon="delete-outline"
+                  onPress={() => dispatch(removeVideo(item))}
+                />
               )}
-            </ThemedView>
-          </Pressable>
+            </View>
+          </Card>
         )}
         ListEmptyComponent={
-          <ThemedText themeColor="textSecondary" style={styles.empty}>
+          <Text
+            variant="bodyMedium"
+            style={[styles.empty, { color: theme.colors.onSurfaceVariant }]}
+          >
             No videos yet. Use Add Video and share a link back from YouTube.
-          </ThemedText>
+          </Text>
         }
       />
-    </ThemedView>
+    </View>
   );
 }
 
@@ -322,16 +331,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.three,
   },
-  addButton: {
-    backgroundColor: '#208AEF',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-    alignSelf: 'flex-start',
-  },
-  addButtonLabel: {
-    color: '#ffffff',
-  },
   castButton: {
     width: 40,
     height: 40,
@@ -342,37 +341,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  playOnTv: {
-    // Same accent as the Add Video button.
-    color: '#208AEF',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
   pendingVideo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    gap: Spacing.two,
+    paddingLeft: Spacing.three,
     borderRadius: Spacing.two,
     borderCurve: 'continuous',
   },
   pendingVideoUrl: {
     flex: 1,
   },
-  addAction: {
-    // Same accent as the Add Video button.
-    color: '#208AEF',
-  },
   videoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.two,
-    borderCurve: 'continuous',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
   },
   thumbnail: {
     // 16:9, like the YouTube thumbnails it shows.
@@ -385,7 +370,6 @@ const styles = StyleSheet.create({
   videoInfo: {
     flex: 1,
     gap: Spacing.half,
-    backgroundColor: 'transparent',
   },
   empty: {
     textAlign: 'center',

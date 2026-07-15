@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Button, Text, TextInput, useTheme } from "react-native-paper";
 
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { MaxContentWidth, Spacing } from "@/constants/theme";
-import { useTheme } from "@/hooks/use-theme";
 import { register } from "@/services/userIdentity";
 
 /**
@@ -39,46 +37,42 @@ export default function RegisterScreen({
   };
 
   return (
-    <ThemedView style={styles.screen}>
-      <ThemedView style={styles.content}>
-        <ThemedText type="title">Welcome</ThemedText>
-        <ThemedText themeColor="textSecondary">
+    <View
+      style={[styles.screen, { backgroundColor: theme.colors.background }]}
+    >
+      <View style={styles.content}>
+        <Text variant="headlineMedium">Welcome</Text>
+        <Text
+          variant="bodyMedium"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
           What should other party members call you?
-        </ThemedText>
+        </Text>
 
         <TextInput
+          mode="outlined"
+          label="Your name"
           value={name}
           onChangeText={setName}
-          placeholder="Your name"
-          placeholderTextColor={theme.textSecondary}
           autoFocus
-          style={[
-            styles.input,
-            { color: theme.text, backgroundColor: theme.backgroundElement },
-          ]}
           onSubmitEditing={submit}
         />
-        <Pressable
+        <Button
+          mode="contained"
           onPress={submit}
+          loading={submitting}
           disabled={submitting}
-          style={({ pressed }) => [
-            styles.submitButton,
-            { backgroundColor: theme.backgroundSelected },
-            (pressed || submitting) && styles.pressed,
-          ]}
         >
-          <ThemedText type="link">
-            {submitting ? "Registering…" : "Continue"}
-          </ThemedText>
-        </Pressable>
+          {submitting ? "Registering…" : "Continue"}
+        </Button>
 
         {error && (
-          <ThemedText type="small" style={styles.errorText}>
+          <Text variant="bodySmall" style={{ color: theme.colors.error }}>
             {error}
-          </ThemedText>
+          </Text>
         )}
-      </ThemedView>
-    </ThemedView>
+      </View>
+    </View>
   );
 }
 
@@ -93,23 +87,5 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     width: "100%",
     alignSelf: "center",
-  },
-  input: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderCurve: "continuous",
-  },
-  submitButton: {
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderCurve: "continuous",
-    alignItems: "center",
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  errorText: {
-    color: "#d93025",
   },
 });
