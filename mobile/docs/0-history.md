@@ -138,3 +138,8 @@ Committed as 9800654
 
 On Android showCastDialog() just clicks the most recently mounted native CastButton, so removing it made the button a silent no-op; a hidden 1×1 CastButton now stays mounted behind the Paper button.
 Also moved Play on TV / Stop into the action row next to Add Video and Connect TV (row wraps on narrow screens).
+
+### Fixed the 5-minute cast disconnect
+
+CastReceiverOptions takes no constructor arguments, so the receiver's disableIdleTimeout: true had been silently discarded and CAF killed every session after exactly 5 idle minutes (it never sees media, since YouTube plays in an iframe).
+The flag is now assigned as a property, and sessions survive full-length videos. Diagnosed from phone logcat: connect at 16:25:44, teardown at 16:30:47.
