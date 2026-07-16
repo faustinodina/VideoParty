@@ -1,17 +1,17 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
-
-import { Colors } from '@/constants/theme';
+import { useTheme } from 'react-native-paper';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  // The native tab bar can't render Paper components, but it takes the
+  // Paper theme's colors: the same roles BottomNavigation would use (MD3
+  // secondaryContainer pill, onSurface selected label).
+  const theme = useTheme();
 
   return (
     <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
+      backgroundColor={theme.colors.background}
+      indicatorColor={theme.colors.secondaryContainer}
+      labelStyle={{ selected: { color: theme.colors.onSurface } }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Parties</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
