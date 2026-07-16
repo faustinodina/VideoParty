@@ -28,5 +28,13 @@ namespace VideoParty.Api.Hubs
     // by the organizer) so they stop receiving its events.
     public Task LeaveParty(Guid partyId) =>
         Groups.RemoveFromGroupAsync(Context.ConnectionId, partyId.ToString());
+
+    // The organizer's phone is the only cast sender, so TV playback
+    // failures (e.g. an embed-blocked video) are known only to it. This
+    // relays the failure to the rest of the party; the reporter is
+    // excluded because it already shows the error locally.
+    public Task ReportPlaybackIssue(Guid partyId, string message) =>
+        Clients.OthersInGroup(partyId.ToString())
+            .SendAsync("PlaybackIssue", new { partyId, message });
   }
 }

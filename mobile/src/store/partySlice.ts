@@ -14,7 +14,7 @@ import {
   removeMember as removeMemberApi,
   removeVideo as removeVideoApi,
 } from "@/services/partyApi";
-import signalR from "@/services/signalRService";
+import signalR, { PlaybackIssue } from "@/services/signalRService";
 import { getUserName } from "@/services/userIdentity";
 import type { RootState } from "@/store";
 
@@ -44,6 +44,12 @@ interface PartyState {
   videoTargetPartyId: string | null;
   addingVideo: boolean;
   addVideoError: string | null;
+  /**
+   * Why the TV skipped or stopped, reported by the organizer's phone and
+   * relayed by the API. Shown until dismissed or the party changes; never
+   * set on the organizer's own device (it shows its local error instead).
+   */
+  playbackIssue: string | null;
 }
 
 const initialState: PartyState = {
@@ -61,6 +67,7 @@ const initialState: PartyState = {
   videoTargetPartyId: null,
   addingVideo: false,
   addVideoError: null,
+  playbackIssue: null,
 };
 
 
@@ -266,6 +273,20 @@ const partySlice = createSlice({
         );
       }
     },
+    // Dispatched from the app-level SignalR subscription when the
+    // organizer's phone reports a TV playback failure for the open party.
+    playbackIssueReceived(state, action: PayloadAction<PlaybackIssue>) {
+      if (
+        state.activePartyId &&
+        action.payload.partyId.toLowerCase() ===
+          state.activePartyId.toLowerCase()
+      ) {
+        state.playbackIssue = action.payload.message;
+      }
+    },
+    clearPlaybackIssue(state) {
+      state.playbackIssue = null;
+    },
     // Add Video is about to open YouTube for this party: remember it so the
     // link that comes back through the share sheet is posted to it, whatever
     // party happens to be open by then.
@@ -294,6 +315,7 @@ const partySlice = createSlice({
         state.activePartyId = null;
         state.members = [];
         state.videos = [];
+        state.playbackIssue = null;
       }
       // A shared link can no longer target a party the user is not in.
       if (state.videoTargetPartyId?.toLowerCase() === partyId) {
@@ -326,6 +348,7 @@ const partySlice = createSlice({
         state.members = action.payload.members;
         // A brand-new party has nothing to fetch: its playlist is empty.
         state.videos = [];
+        state.playbackIssue = null;
       })
       .addCase(createParty.rejected, (state, action) => {
         state.creating = false;
@@ -340,6 +363,7 @@ const partySlice = createSlice({
         state.activePartyId = action.payload.partyId;
         state.members = action.payload.members;
         state.videos = action.payload.videos;
+        state.playbackIssue = null;
       })
       .addCase(joinParty.rejected, (state, action) => {
         state.joining = false;
@@ -366,6 +390,7 @@ const partySlice = createSlice({
           state.activePartyId = null;
           state.members = [];
           state.videos = [];
+          state.playbackIssue = null;
         }
         if (state.videoTargetPartyId?.toLowerCase() === partyId) {
           state.videoTargetPartyId = null;
@@ -400,6 +425,7 @@ const partySlice = createSlice({
         state.activePartyId = action.payload.partyId;
         state.members = action.payload.members;
         state.videos = action.payload.videos;
+        state.playbackIssue = null;
       });
   },
 });
@@ -410,8 +436,10 @@ export const selectActiveParty = (state: RootState) =>
 
 export const {
   clearPendingVideo,
+  clearPlaybackIssue,
   memberJoined,
   memberRemoved,
+  playbackIssueReceived,
   removedFromParty,
   videoAdded,
   videoRemoved,

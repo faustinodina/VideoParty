@@ -22,10 +22,12 @@ import {
   CastStatus,
   extractYouTubeVideoId,
 } from '@/services/castService';
+import signalR from '@/services/signalRService';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   addPendingVideo,
   clearPendingVideo,
+  clearPlaybackIssue,
   removeVideo,
   selectActiveParty,
   videoRequested,
@@ -43,6 +45,9 @@ export default function VideosScreen() {
   );
   const addingVideo = useAppSelector((state) => state.party.addingVideo);
   const addVideoError = useAppSelector((state) => state.party.addVideoError);
+  // A TV playback failure relayed from the organizer's phone; never set on
+  // the organizer's own device (castError covers it there).
+  const playbackIssue = useAppSelector((state) => state.party.playbackIssue);
 
   // Casting is organizer-only: the organizer's phone is at the party, next
   // to the TV. Guests never see the cast UI.
@@ -54,6 +59,7 @@ export default function VideosScreen() {
   // and the channel itself through refs to see their current values.
   const videosRef = useRef(videos);
   const channelRef = useRef<ReturnType<typeof useCastChannel>>(null);
+  const partyIdRef = useRef<string | null>(null);
   // The id of the video the TV is playing. Not simply the top of the list:
   // the organizer can remove any row — including the playing one — while
   // it plays, so what ended must be identified, not assumed.
@@ -107,11 +113,25 @@ export default function VideosScreen() {
         };
 
         if (status.state === 'error') {
-          setCastError(
-            status.embedBlocked
-              ? "This video can't play on the TV (its owner disabled embedding), so it was skipped. It still plays in YouTube."
-              : `The TV could not play this video (error ${status.errorCode}).`
+          // The message names the failing video because it also goes to
+          // the guests, who lack this phone's context of what was playing.
+          const failing = videosRef.current.find(
+            (v) => v.partyVideoId === playingIdRef.current
           );
+          const label = failing ? (failing.title ?? failing.url) : 'the video';
+          const message = status.embedBlocked
+            ? `“${label}” can't play on the TV (its owner disabled embedding), so it was skipped. It still plays in YouTube.`
+            : `The TV could not play “${label}” (error ${status.errorCode}).`;
+          setCastError(message);
+          if (partyIdRef.current) {
+            // Fire-and-forget: failing to share the message with the party
+            // must not disturb the local error handling.
+            signalR
+              .reportPlaybackIssue(partyIdRef.current, message)
+              .catch((error) =>
+                console.log('Could not report the playback issue', error)
+              );
+          }
           if (status.embedBlocked) {
             // A blocked video would fail every retry, so treat it like an
             // ended one and keep the party going. The message stays up
@@ -132,6 +152,7 @@ export default function VideosScreen() {
   useEffect(() => {
     videosRef.current = videos;
     channelRef.current = castChannel;
+    partyIdRef.current = activeParty?.partyId ?? null;
   });
 
   // The single TV control plays the top of the playlist; everything below
@@ -254,6 +275,24 @@ export default function VideosScreen() {
                 {castError}
               </Text>
             )}
+            {playbackIssue && (
+              <View style={styles.playbackIssueRow}>
+                <Text
+                  variant="bodySmall"
+                  style={[
+                    styles.playbackIssueText,
+                    { color: theme.colors.error },
+                  ]}
+                >
+                  {playbackIssue}
+                </Text>
+                <IconButton
+                  icon="close"
+                  size={18}
+                  onPress={() => dispatch(clearPlaybackIssue())}
+                />
+              </View>
+            )}
             {pendingVideoUrl && (
               <Surface mode="flat" style={styles.pendingVideo}>
                 <Text
@@ -370,6 +409,13 @@ const styles = StyleSheet.create({
     width: 1,
     height: 1,
     opacity: 0,
+  },
+  playbackIssueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  playbackIssueText: {
+    flex: 1,
   },
   pendingVideo: {
     flexDirection: 'row',

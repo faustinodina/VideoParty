@@ -21,6 +21,13 @@ const logger: ILogger = {
   },
 };
 
+// A TV playback failure reported by the organizer's phone and relayed by
+// the API to the rest of the party (see onPlaybackIssue).
+export interface PlaybackIssue {
+  partyId: string;
+  message: string;
+}
+
 class SignalRService {
   private connection: HubConnection | null = null;
   // Remembered so we can re-join the party group after an automatic reconnect.
@@ -98,6 +105,16 @@ class SignalRService {
     }
   }
 
+  // Tells the rest of the party why the TV skipped or stopped (the API
+  // relays to everyone in the group but this client). Quietly does nothing
+  // while disconnected: the organizer already sees the error locally, and
+  // a failure to share it must not disturb the cast error handling.
+  async reportPlaybackIssue(partyId: string, message: string) {
+    if (this.connection?.state === "Connected") {
+      await this.connection.invoke("ReportPlaybackIssue", partyId, message);
+    }
+  }
+
   async send(method: string, ...args: any[]) {
     if (!this.connection) throw new Error("SignalR not connected");
 
@@ -144,6 +161,13 @@ class SignalRService {
   onVideoRemoved(callback: (video: PartyVideo) => void) {
     this.on("VideoRemoved", callback);
     return () => this.off("VideoRemoved", callback);
+  }
+
+  // Broadcast by the API when the organizer's phone reports a TV playback
+  // failure (see reportPlaybackIssue); not echoed back to the reporter.
+  onPlaybackIssue(callback: (issue: PlaybackIssue) => void) {
+    this.on("PlaybackIssue", callback);
+    return () => this.off("PlaybackIssue", callback);
   }
 
   async disconnect() {
