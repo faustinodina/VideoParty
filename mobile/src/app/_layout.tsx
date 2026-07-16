@@ -9,6 +9,7 @@ import {
   ShareIntentProvider,
   useShareIntentContext,
 } from "expo-share-intent";
+import { createMaterial3Theme } from "@pchmn/expo-material3-theme";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Alert, Platform, useColorScheme } from "react-native";
@@ -58,27 +59,20 @@ function ShareIntentHandler() {
   return null;
 }
 
-// Material 3 themes carrying the app's existing accent and pure black/white
-// backgrounds, so Paper screens sit next to the not-yet-converted Themed*
-// screens without a visible seam.
+// Material 3 palettes generated from the brand color, per Paper's theming
+// guide. MD3 tone-maps the source: colors.primary is an amber-derived tone
+// (dark gold in light mode, light amber in dark), not the literal hex.
+// Backgrounds stay pure white/black so Paper screens sit next to the
+// remaining custom-themed components without a visible seam.
+const material3 = createMaterial3Theme("#ffa000");
 const paperThemes = {
   light: {
     ...MD3LightTheme,
-    colors: {
-      ...MD3LightTheme.colors,
-      primary: "#208AEF",
-      onPrimary: "#ffffff",
-      background: "#ffffff",
-    },
+    colors: { ...material3.light, background: "#ffffff" },
   },
   dark: {
     ...MD3DarkTheme,
-    colors: {
-      ...MD3DarkTheme.colors,
-      primary: "#208AEF",
-      onPrimary: "#ffffff",
-      background: "#000000",
-    },
+    colors: { ...material3.dark, background: "#000000" },
   },
 };
 
@@ -163,9 +157,10 @@ export default function RootLayout() {
           <ThemeProvider
             value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
           >
-            {/* The header bar under the status bar is brand blue in both
-                color schemes, so the icons must always be light. */}
-            <StatusBar style="light" />
+            {/* The header bar under the status bar is theme primary, which
+                MD3 makes dark (gold) in light mode but LIGHT (amber) in
+                dark mode — so the icon color is inverted from the usual. */}
+            <StatusBar style={colorScheme === "dark" ? "dark" : "light"} />
             <AnimatedSplashOverlay />
             {registered === false && (
               <RegisterScreen onRegistered={() => setRegistered(true)} />
