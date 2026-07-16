@@ -1,7 +1,10 @@
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Linking, StyleSheet, View } from 'react-native';
-import CastContext, { useCastChannel } from 'react-native-google-cast';
+import CastContext, {
+  CastButton,
+  useCastChannel,
+} from 'react-native-google-cast';
 import {
   Button,
   Card,
@@ -201,16 +204,30 @@ export default function VideosScreen() {
                 Add Video
               </Button>
               {isOrganizer && (
-                // The native CastButton is a bare icon; a Paper button
-                // matching Add Video opens the same route dialog, which
-                // also handles disconnecting.
-                <Button
-                  mode="contained"
-                  icon={castChannel ? 'cast-connected' : 'cast'}
-                  onPress={() => CastContext.showCastDialog()}
-                >
-                  {castChannel ? 'TV Connected' : 'Connect TV'}
-                </Button>
+                // The native CastButton is a bare icon, so a Paper button
+                // matching Add Video is the visible control. On Android,
+                // showCastDialog() works by clicking the most recently
+                // mounted native CastButton — one must stay in the tree,
+                // hidden, or the call silently does nothing.
+                <>
+                  <CastButton style={styles.hiddenCastButton} />
+                  <Button
+                    mode="contained"
+                    icon={castChannel ? 'cast-connected' : 'cast'}
+                    onPress={() => CastContext.showCastDialog()}
+                  >
+                    {castChannel ? 'TV Connected' : 'Connect TV'}
+                  </Button>
+                  {castChannel && (tvPlaying || topVideoId) && (
+                    <Button
+                      mode="contained"
+                      icon={tvPlaying ? 'stop' : 'play'}
+                      onPress={toggleTv}
+                    >
+                      {tvPlaying ? 'Stop' : 'Play on TV'}
+                    </Button>
+                  )}
+                </>
               )}
             </View>
             {castError && (
@@ -249,18 +266,7 @@ export default function VideosScreen() {
                 Could not add the video: {addVideoError}
               </Text>
             )}
-            <View style={styles.playlistRow}>
-              <Text variant="titleMedium">Playlist</Text>
-              {castChannel && (tvPlaying || topVideoId) && (
-                <Button
-                  mode="contained"
-                  icon={tvPlaying ? 'stop' : 'play'}
-                  onPress={toggleTv}
-                >
-                  {tvPlaying ? 'Stop' : 'Play on TV'}
-                </Button>
-              )}
-            </View>
+            <Text variant="titleMedium">Playlist</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -334,12 +340,17 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
+    // Three buttons when connected to a TV; too wide for narrow phones.
+    flexWrap: 'wrap',
     gap: Spacing.three,
   },
-  playlistRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  // Attached to the window (so showCastDialog finds it) but invisible
+  // and out of the flex flow.
+  hiddenCastButton: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
   },
   pendingVideo: {
     flexDirection: 'row',
