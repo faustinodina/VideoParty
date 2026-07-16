@@ -65,8 +65,16 @@ export default function VideosScreen() {
   const castChannel = useCastChannel(
     CAST_NAMESPACE,
     useCallback(
-      (message: Record<string, any> | string) => {
-        if (typeof message === 'string' || message.type !== 'status') return;
+      (raw: Record<string, any> | string) => {
+        // On Android the native module delivers the receiver's JSON as a
+        // raw string; only iOS parses it into an object.
+        let message: Record<string, any>;
+        try {
+          message = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch {
+          return;
+        }
+        if (message.type !== 'status') return;
         const status = message as CastStatus;
         setTvState(status.state);
         if (status.state === 'error') {
