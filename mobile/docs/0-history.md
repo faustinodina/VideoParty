@@ -143,3 +143,17 @@ Also moved Play on TV / Stop into the action row next to Add Video and Connect T
 
 CastReceiverOptions takes no constructor arguments, so the receiver's disableIdleTimeout: true had been silently discarded and CAF killed every session after exactly 5 idle minutes (it never sees media, since YouTube plays in an iframe).
 The flag is now assigned as a property, and sessions survive full-length videos. Diagnosed from phone logcat: connect at 16:25:44, teardown at 16:30:47.
+
+### Any error that on casting are relayed to all party guests
+
+What was built, end to end:
+
+- UserHub.cs — new ReportPlaybackIssue(partyId, message) method that relays the message to OthersInGroup, so everyone in the party except the reporting phone gets a PlaybackIssue event.
+- signalRService.ts — reportPlaybackIssue() (quietly no-ops while disconnected) and a typed onPlaybackIssue subscription, mirroring the existing onVideoAdded style.
+- partySlice.ts — new playbackIssue state with playbackIssueReceived / clearPlaybackIssue reducers; it filters by the open party like the other SignalR events, and clears whenever a party is opened, joined, created, left, or closed.
+- \_layout.tsx — bridges the PlaybackIssue event into the store alongside the other subscriptions.
+- videos.tsx — the error message now names the failing video (guests can't know what the TV was playing: "Never Gonna Give You Up" can't play on the TV (its owner disabled embedding), so it was skipped…). The organizer shows it locally as before and fire-and-forgets the report; guests see the relayed message in red on their Videos tab with an X to dismiss it (it can't auto-clear on the next event, because the skip's own VideoRemoved arrives immediately after and would wipe it before anyone read it).
+
+The organizer's device never double-shows (it's excluded from the relay), and any error type is shared — embed-blocked and other playback failures alike.
+
+To test: restart the API, reload both phones, cast on the organizer, play the non-embeddable video, and the guest phone should show the named error on its Videos tab. Then I'll commit.
