@@ -131,3 +131,10 @@ The disconnection is automatically fixed by SignalR, but the log is displayed.
 The fix is to redirect the SignalR log to the console(?)
 
 Committed as 9800654
+
+## 2026-07-16
+
+### Fixed the Connect TV regression from the Paper conversion
+
+On Android showCastDialog() just clicks the most recently mounted native CastButton, so removing it made the button a silent no-op; a hidden 1×1 CastButton now stays mounted behind the Paper button.
+Also moved Play on TV / Stop into the action row next to Add Video and Connect TV (row wraps on narrow screens).
