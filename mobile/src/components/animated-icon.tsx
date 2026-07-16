@@ -125,8 +125,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   backgroundSolidColor: {
+    // Must match the native splash color in app.json, or the handoff
+    // from the native splash to this overlay shows a color jump.
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#ffa000',
     zIndex: 1000,
   },
 });
