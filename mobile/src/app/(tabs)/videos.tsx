@@ -77,33 +77,26 @@ export default function VideosScreen() {
         if (message.type !== 'status') return;
         const status = message as CastStatus;
         setTvState(status.state);
-        if (status.state === 'error') {
-          setCastError(
-            status.embedBlocked
-              ? "This video can't play on the TV: its owner disabled embedding. It still plays in YouTube."
-              : `The TV could not play this video (error ${status.errorCode}).`
-          );
-        }
-        if (status.state === 'ended') {
-          // Auto-advance: the finished video leaves the playlist (for
-          // every member, via removeVideo) and the next castable one
-          // starts. Only the organizer's phone has a cast session, so no
-          // one else issues the removal. The finished video is usually the
-          // top of the list, but may already be gone (removed manually
-          // while it played), in which case there is nothing to delete.
+
+        // Auto-advance: the video the TV was on leaves the playlist (for
+        // every member, via removeVideo) and the next castable one starts.
+        // Only the organizer's phone has a cast session, so no one else
+        // issues the removal. The video is usually the top of the list,
+        // but may already be gone (removed manually while it played), in
+        // which case there is nothing to delete.
+        const advance = () => {
           const list = videosRef.current;
-          const ended = list.find(
+          const current = list.find(
             (v) => v.partyVideoId === playingIdRef.current
           );
-          if (ended) {
-            dispatch(removeVideo(ended));
+          if (current) {
+            dispatch(removeVideo(current));
           }
           const next = list.find(
             (v) => v.partyVideoId !== playingIdRef.current
           );
           const nextId = next ? extractYouTubeVideoId(next.url) : null;
           if (next && nextId && channelRef.current) {
-            setCastError(null);
             const command: CastCommand = { type: 'play', videoId: nextId };
             channelRef.current.sendMessage(command);
             playingIdRef.current = next.partyVideoId;
@@ -111,6 +104,24 @@ export default function VideosScreen() {
           } else {
             playingIdRef.current = null;
           }
+        };
+
+        if (status.state === 'error') {
+          setCastError(
+            status.embedBlocked
+              ? "This video can't play on the TV (its owner disabled embedding), so it was skipped. It still plays in YouTube."
+              : `The TV could not play this video (error ${status.errorCode}).`
+          );
+          if (status.embedBlocked) {
+            // A blocked video would fail every retry, so treat it like an
+            // ended one and keep the party going. The message stays up
+            // while the next video plays.
+            advance();
+          }
+        }
+        if (status.state === 'ended') {
+          setCastError(null);
+          advance();
         }
       },
       [dispatch]
