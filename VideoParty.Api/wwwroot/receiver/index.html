@@ -173,11 +173,14 @@
         }
       });
 
-      context.start(
-        // No CAF media pipeline is used (YouTube plays inside the iframe),
-        // so CAF must not kill the session for media inactivity.
-        new cast.framework.CastReceiverOptions({ disableIdleTimeout: true })
-      );
+      // No CAF media pipeline is used (YouTube plays inside the iframe),
+      // so CAF must not kill the session for media inactivity. The options
+      // constructor takes no arguments — the flag has to be assigned as a
+      // property, or it is silently ignored and CAF ends the session after
+      // 5 idle minutes.
+      const options = new cast.framework.CastReceiverOptions();
+      options.disableIdleTimeout = true;
+      context.start(options);
     </script>
   </body>
 </html>
