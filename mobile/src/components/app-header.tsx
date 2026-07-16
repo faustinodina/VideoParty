@@ -1,8 +1,7 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
 import { UserBadge } from './user-badge';
 
 import { Spacing } from '@/constants/theme';
@@ -12,15 +11,32 @@ import { Spacing } from '@/constants/theme';
  * no header of its own, so each screen renders this above its content. The
  * web build renders nothing (see app-header.web): its floating tab bar
  * already carries the brand and the badge.
+ *
+ * The bar is the one place the accent color is used as a background, which
+ * is what sets it apart from the black/white screens under it.
  */
 export default function AppHeader() {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
 
   return (
-    <ThemedView style={[styles.bar, { paddingTop: insets.top + Spacing.two }]}>
-      <ThemedText type="smallBold">VideoParty</ThemedText>
+    <View
+      style={[
+        styles.bar,
+        {
+          paddingTop: insets.top + Spacing.two,
+          backgroundColor: theme.colors.primary,
+        },
+      ]}
+    >
+      <Text
+        variant="titleMedium"
+        style={[styles.brand, { color: theme.colors.onPrimary }]}
+      >
+        VideoParty
+      </Text>
       <UserBadge />
-    </ThemedView>
+    </View>
   );
 }
 
@@ -31,5 +47,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.two,
+  },
+  brand: {
+    fontWeight: '700',
   },
 });

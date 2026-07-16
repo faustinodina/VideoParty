@@ -9,6 +9,7 @@ import {
   ShareIntentProvider,
   useShareIntentContext,
 } from "expo-share-intent";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Alert, Platform, useColorScheme } from "react-native";
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
@@ -162,6 +163,9 @@ export default function RootLayout() {
           <ThemeProvider
             value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
           >
+            {/* The header bar under the status bar is brand blue in both
+                color schemes, so the icons must always be light. */}
+            <StatusBar style="light" />
             <AnimatedSplashOverlay />
             {registered === false && (
               <RegisterScreen onRegistered={() => setRegistered(true)} />
