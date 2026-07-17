@@ -157,3 +157,9 @@ What was built, end to end:
 The organizer's device never double-shows (it's excluded from the relay), and any error type is shared — embed-blocked and other playback failures alike.
 
 To test: restart the API, reload both phones, cast on the organizer, play the non-embeddable video, and the guest phone should show the named error on its Videos tab. Then I'll commit.
+
+## 2026-07-17
+
+### Added a Settings (gear) menu to the app header with "Reset identity"
+
+Clears the device credentials and returns to the registration screen, so a cloned phone can become its own user. Made SignalR resilient: infinite reconnect backoff (was: gave up after ~40s), restart on close/failed start, and a catch-up refetch of the open party's members/playlist on every reconnect and on app foreground — a phone left idle no longer goes permanently deaf to party events.
