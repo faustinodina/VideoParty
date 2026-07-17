@@ -12,7 +12,7 @@ import {
 import { createMaterial3Theme } from "@pchmn/expo-material3-theme";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { Alert, Platform, useColorScheme } from "react-native";
+import { Alert, AppState, Platform, useColorScheme } from "react-native";
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
 import { Provider } from "react-redux";
 
@@ -33,6 +33,7 @@ import {
   memberJoined,
   memberRemoved,
   playbackIssueReceived,
+  refreshActiveParty,
   removedFromParty,
   videoAdded,
   videoRemoved,
@@ -154,9 +155,31 @@ export default function RootLayout() {
       store.dispatch(fetchParties());
     });
 
+    // Events broadcast while the connection was down are lost for good, so
+    // every (re-)established connection re-fetches the open party's state.
+    const unsubscribeCatchUp = signalR.onCatchUp(() => {
+      store.dispatch(refreshActiveParty());
+    });
+
+    // Android freezes JS timers in the background, so a dead connection may
+    // not have healed while away: coming back to the foreground kicks the
+    // reconnect (which catches up via onCatchUp) and refreshes the open
+    // party in case events were missed while the connection looked alive.
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (state) => {
+        if (state === "active") {
+          signalR.ensureConnected();
+          store.dispatch(refreshActiveParty());
+        }
+      }
+    );
+
     signalR.connect();
 
     return () => {
+      appStateSubscription.remove();
+      unsubscribeCatchUp();
       unsubscribeJoined();
       unsubscribeVideoAdded();
       unsubscribeVideoRemoved();

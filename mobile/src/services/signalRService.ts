@@ -35,9 +35,18 @@ class SignalRService {
   // Handlers registered before connect(): the HubConnection doesn't exist
   // yet at that point, so they are queued here and applied in connect().
   private handlers: [string, (...args: any[]) => void][] = [];
+  // Set by disconnect() so a deliberate stop is not fought by the
+  // restart-on-close logic below.
+  private stopped = false;
+  // In-flight start attempt, shared so ensureConnected() racing the
+  // restart-on-close loop cannot start the connection twice.
+  private startPromise: Promise<void> | null = null;
+  // Listeners for re-established connections (see onCatchUp).
+  private catchUpListeners: (() => void)[] = [];
 
   async connect() {
     console.log("SignalR connecting to", HUB_URL);
+    this.stopped = false;
 
     this.connection = new HubConnectionBuilder()
       .withUrl(HUB_URL, {
@@ -45,7 +54,13 @@ class SignalRService {
         // bearer setup reads it from there for hub paths.
         accessTokenFactory: () => getAccessToken(),
       })
-      .withAutomaticReconnect()
+      // Never stop retrying: the default policy gives up after four
+      // attempts (~40s), which permanently deafened phones whose socket
+      // died in the background. Exponential backoff capped at 30s.
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: ({ previousRetryCount }) =>
+          Math.min(30_000, 1_000 * 2 ** previousRetryCount),
+      })
       .configureLogging(logger)
       .build();
 
@@ -62,18 +77,79 @@ class SignalRService {
       // Group membership is tied to the connection id, which changes on
       // reconnect, so re-join the party group to keep receiving its events.
       await this.rejoinCurrentParty();
+      // Events broadcast while disconnected are gone for good; let the app
+      // re-fetch what they would have updated.
+      this.notifyCatchUp();
     });
 
     this.connection.onclose((error) => {
       console.log("SignalR closed", error);
+      // The automatic reconnect handles transient drops; landing here means
+      // the connection is gone for good (e.g. the negotiation itself
+      // failed), so start over unless the stop was deliberate.
+      if (!this.stopped) {
+        this.ensureStarted();
+      }
     });
 
-    await this.connection.start();
+    await this.ensureStarted();
+  }
 
-    console.log("SignalR connected");
+  /**
+   * Subscribes to connections (re-)established after a gap — including the
+   * first one, harmlessly. Events broadcast during the gap were missed and
+   * are never replayed, so listeners should re-fetch the state those events
+   * maintain. Returns an unsubscribe function for cleanup.
+   */
+  onCatchUp(listener: () => void): () => void {
+    this.catchUpListeners.push(listener);
+    return () => {
+      this.catchUpListeners = this.catchUpListeners.filter(
+        (l) => l !== listener
+      );
+    };
+  }
 
-    // Flush a party join requested before the connection finished starting.
-    await this.rejoinCurrentParty();
+  // Reconnects if the connection died while the app was backgrounded:
+  // Android freezes JS timers, so the retry schedule may not have run.
+  // Called when the app returns to the foreground.
+  async ensureConnected() {
+    if (!this.stopped && this.connection?.state === "Disconnected") {
+      await this.ensureStarted();
+    }
+  }
+
+  private ensureStarted(): Promise<void> {
+    this.startPromise ??= this.startUntilConnected().finally(() => {
+      this.startPromise = null;
+    });
+    return this.startPromise;
+  }
+
+  // Keeps trying to start until it sticks; withAutomaticReconnect only
+  // covers drops of an established connection, so failures of start()
+  // itself (e.g. the API is unreachable) get their own retry loop.
+  private async startUntilConnected() {
+    while (!this.stopped && this.connection?.state === "Disconnected") {
+      try {
+        await this.connection.start();
+        console.log("SignalR connected");
+        // Flush a party join requested before the connection finished
+        // starting, then let the app re-fetch anything it may have missed.
+        await this.rejoinCurrentParty();
+        this.notifyCatchUp();
+        return;
+      } catch (error) {
+        console.log("SignalR start failed, retrying in 5s", error);
+        await new Promise((resolve) => setTimeout(resolve, 5_000));
+      }
+    }
+  }
+
+  private notifyCatchUp() {
+    for (const listener of this.catchUpListeners) {
+      listener();
+    }
   }
 
   // Join a party group so this client receives that party's events
@@ -171,6 +247,9 @@ class SignalRService {
   }
 
   async disconnect() {
+    // Before stop(): its onclose callback must not restart the connection.
+    this.stopped = true;
+
     await this.connection?.stop();
 
     this.connection = null;

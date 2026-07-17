@@ -200,6 +200,27 @@ export const addPendingVideo = createAsyncThunk(
   }
 );
 
+// Re-fetches the open party's members and playlist after a gap in SignalR
+// coverage (a reconnect, or the app returning to the foreground): events
+// broadcast during the gap were missed and are never replayed, so the
+// snapshot is re-fetched wholesale. Silent — no loading flags, the fresh
+// data just replaces the stale rows. A no-op without an open party.
+export const refreshActiveParty = createAsyncThunk(
+  "party/refreshActive",
+  async (_: void, { getState }) => {
+    const partyId = (getState() as RootState).party.activePartyId!;
+    const [members, videos] = await Promise.all([
+      getMembers(partyId),
+      getVideos(partyId),
+    ]);
+    return { partyId, members, videos };
+  },
+  {
+    condition: (_, { getState }) =>
+      Boolean((getState() as RootState).party.activePartyId),
+  }
+);
+
 // Opens a party the user already belongs to (tapping a row in the list).
 export const openParty = createAsyncThunk(
   "party/open",
@@ -431,6 +452,18 @@ const partySlice = createSlice({
         state.members = action.payload.members;
         state.videos = action.payload.videos;
         state.playbackIssue = null;
+      })
+      // Rejections stay silent on purpose: a failed catch-up just leaves
+      // the current rows until the next one.
+      .addCase(refreshActiveParty.fulfilled, (state, action) => {
+        // Skip a refresh that raced with closing or switching the party.
+        if (
+          state.activePartyId?.toLowerCase() ===
+          action.payload.partyId.toLowerCase()
+        ) {
+          state.members = action.payload.members;
+          state.videos = action.payload.videos;
+        }
       });
   },
 });
