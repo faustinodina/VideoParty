@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SettingsMenu } from './settings-menu';
 import { UserBadge } from './user-badge';
 
 import { Spacing } from '@/constants/theme';
@@ -36,6 +37,7 @@ export default function AppHeader() {
         VideoParty
       </Text>
       <UserBadge />
+      <SettingsMenu />
     </View>
   );
 }
@@ -44,11 +46,12 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.two,
   },
   brand: {
+    flex: 1,
     fontWeight: '700',
   },
 });

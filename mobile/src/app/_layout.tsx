@@ -19,11 +19,17 @@ import { Provider } from "react-redux";
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import RegisterScreen from "@/components/register-screen";
 import signalR from "@/services/signalRService";
-import { getUserId, isRegistered, onIdentityReset } from "@/services/userIdentity";
+import {
+  getUserId,
+  isRegistered,
+  onIdentityCleared,
+  onIdentityReset,
+} from "@/services/userIdentity";
 import { store } from "@/store";
 import {
   addPendingVideo,
   fetchParties,
+  identityCleared,
   memberJoined,
   memberRemoved,
   playbackIssueReceived,
@@ -86,6 +92,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     isRegistered().then(setRegistered);
+    // Reset identity (settings menu) drops the credentials: return to the
+    // registration screen (unmounting the app disconnects SignalR via the
+    // effect below) and forget the old identity's parties.
+    return onIdentityCleared(() => {
+      store.dispatch(identityCleared());
+      setRegistered(false);
+    });
   }, []);
 
   useEffect(() => {

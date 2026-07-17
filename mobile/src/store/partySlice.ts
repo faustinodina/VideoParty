@@ -304,6 +304,11 @@ const partySlice = createSlice({
       state.videoTargetPartyId = null;
       state.addVideoError = null;
     },
+    // The user reset this device's identity (see _layout): none of the
+    // state belongs to the identity that will be registered next.
+    identityCleared() {
+      return initialState;
+    },
     // This device's user was removed by the organizer: drop the party from
     // the list and close it if it is the one currently open.
     removedFromParty(state, action: PayloadAction<PartyMember>) {
@@ -437,6 +442,7 @@ export const selectActiveParty = (state: RootState) =>
 export const {
   clearPendingVideo,
   clearPlaybackIssue,
+  identityCleared,
   memberJoined,
   memberRemoved,
   playbackIssueReceived,

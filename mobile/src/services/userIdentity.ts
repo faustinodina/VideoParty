@@ -34,6 +34,10 @@ let tokenPromise: Promise<AccessToken> | null = null;
 // to tell the user their previous identity is gone.
 let identityResetListeners: (() => void)[] = [];
 
+// Listeners for deliberate identity clears (see resetIdentity); the app
+// layout subscribes to fall back to the registration screen.
+let identityClearedListeners: (() => void)[] = [];
+
 /**
  * Subscribes to identity resets: the server rejected this device's stored
  * credentials (e.g. the database was recreated) and a fresh identity was
@@ -47,6 +51,35 @@ export function onIdentityReset(listener: () => void): () => void {
       (l) => l !== listener
     );
   };
+}
+
+/**
+ * Subscribes to deliberate identity clears (the user chose Reset identity):
+ * the stored credentials are gone and the app should return to the
+ * registration screen. Returns an unsubscribe function for cleanup.
+ */
+export function onIdentityCleared(listener: () => void): () => void {
+  identityClearedListeners.push(listener);
+  return () => {
+    identityClearedListeners = identityClearedListeners.filter(
+      (l) => l !== listener
+    );
+  };
+}
+
+/**
+ * Discards this device's identity. The server-side user is left behind
+ * untouched (nothing references it afterwards); the app registers a brand
+ * new identity via the registration screen. Party memberships of the old
+ * identity are lost.
+ */
+export async function resetIdentity(): Promise<void> {
+  await AsyncStorage.removeItem(CREDENTIALS_KEY);
+  credentialsPromise = null;
+  tokenPromise = null;
+  for (const listener of identityClearedListeners) {
+    listener();
+  }
 }
 
 /** Whether this device already has an identity. Gates the app on first
