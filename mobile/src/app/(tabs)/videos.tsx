@@ -43,6 +43,17 @@ export default function VideosScreen() {
   const pendingVideoUrl = useAppSelector(
     (state) => state.party.pendingVideoUrl
   );
+  const parties = useAppSelector((state) => state.party.parties);
+  const videoTargetPartyId = useAppSelector(
+    (state) => state.party.videoTargetPartyId
+  );
+  // The party the pending link will be posted to, mirroring the thunk's
+  // choice: the one that launched Add Video, the open party otherwise.
+  const pendingTargetName = videoTargetPartyId
+    ? parties.find(
+        (p) => p.partyId.toLowerCase() === videoTargetPartyId.toLowerCase()
+      )?.name
+    : activeParty?.name;
   const addingVideo = useAppSelector((state) => state.party.addingVideo);
   const addVideoError = useAppSelector((state) => state.party.addVideoError);
   // A TV playback failure relayed from the organizer's phone; never set on
@@ -295,13 +306,18 @@ export default function VideosScreen() {
             )}
             {pendingVideoUrl && (
               <Surface mode="flat" style={styles.pendingVideo}>
-                <Text
-                  variant="bodySmall"
-                  numberOfLines={2}
-                  style={styles.pendingVideoUrl}
-                >
-                  Video to add: {pendingVideoUrl}
-                </Text>
+                <View style={styles.pendingVideoDetails}>
+                  <Text variant="labelMedium">
+                    Add to {pendingTargetName ?? activeParty.name}?
+                  </Text>
+                  <Text
+                    variant="bodySmall"
+                    numberOfLines={1}
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    {pendingVideoUrl}
+                  </Text>
+                </View>
                 <Button
                   compact
                   mode="text"
@@ -425,8 +441,9 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     borderCurve: 'continuous',
   },
-  pendingVideoUrl: {
+  pendingVideoDetails: {
     flex: 1,
+    paddingVertical: Spacing.two,
   },
   videoRow: {
     flexDirection: 'row',

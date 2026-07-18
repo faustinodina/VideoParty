@@ -174,10 +174,11 @@ const videoTargetParty = (state: RootState) =>
   state.party.videoTargetPartyId ?? state.party.activePartyId;
 
 // Posts the share-sheet link to its target party's playlist. Dispatched
-// automatically when the link arrives (see ShareIntentHandler in _layout)
-// and by the pending banner's Add action. The pending link is cleared only
-// on success (see the fulfilled reducer) so a failed post stays in the
-// banner and can be retried.
+// automatically when a link that Add Video initiated arrives (see
+// ShareIntentHandler in _layout) and by the pending banner's Add action,
+// which is how a spontaneous share gets confirmed. The pending link is
+// cleared only on success (see the fulfilled reducer) so a failed post
+// stays in the banner and can be retried.
 export const addPendingVideo = createAsyncThunk(
   "party/addPendingVideo",
   async (_: void, { getState }) => {
@@ -315,7 +316,8 @@ const partySlice = createSlice({
       state.videoTargetPartyId = action.payload;
     },
     // A video link arrived through the share sheet (see ShareIntentHandler
-    // in _layout, which follows this dispatch with addPendingVideo).
+    // in _layout, which follows this dispatch with addPendingVideo when
+    // Add Video initiated the share).
     videoShared(state, action: PayloadAction<string>) {
       state.pendingVideoUrl = action.payload;
       state.addVideoError = null;

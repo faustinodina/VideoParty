@@ -41,9 +41,10 @@ import {
 } from "@/store/partySlice";
 
 // Receives Android share-sheet intents (e.g. Share → VideoParty from
-// YouTube): stores the link, posts it to its party, and lands on the Party
-// tab. Rendered inside ShareIntentProvider and alongside the Stack so
-// navigation is available.
+// YouTube): stores the link and lands on the Videos tab. A share that Add
+// Video initiated is posted to its party right away; a spontaneous one
+// waits in the tab's banner for confirmation. Rendered inside
+// ShareIntentProvider and alongside the Stack so navigation is available.
 function ShareIntentHandler() {
   const { hasShareIntent, shareIntent, resetShareIntent } =
     useShareIntentContext();
@@ -55,10 +56,13 @@ function ShareIntentHandler() {
     const url = shareIntent.webUrl ?? shareIntent.text;
     if (url) {
       store.dispatch(videoShared(url));
-      // Automatic post to the party that launched Add Video (or the open
-      // party). Without one this is a no-op (see the thunk's condition):
-      // the link stays pending until a party can take it.
-      store.dispatch(addPendingVideo());
+      // Only a share that Add Video initiated posts automatically: it named
+      // its target party. A spontaneous share would fall back to whatever
+      // party happens to be open, so it stays pending and the Videos tab
+      // banner asks for confirmation instead.
+      if (store.getState().party.videoTargetPartyId) {
+        store.dispatch(addPendingVideo());
+      }
       router.navigate("/videos");
     }
     resetShareIntent();
