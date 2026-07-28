@@ -1,32 +1,36 @@
-# Replace "videoparty" with your chosen app name (must be globally unique on fly.io).
-# Run `fly launch --no-deploy` the first time to register the name, then `fly deploy`.
-app = "videoparty"
-primary_region = "ord"
+# fly.toml app configuration file generated for videoparty on 2026-07-28T16:05:32Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'videoparty'
+primary_region = 'ord'
 
 [build]
 
 [env]
-  ASPNETCORE_ENVIRONMENT = "Production"
-  ASPNETCORE_HTTP_PORTS = "8080"
-  # Tells ASP.NET Core to trust X-Forwarded-Proto from Fly's proxy so
-  # UseHttpsRedirection works correctly without a redirect loop.
-  ASPNETCORE_FORWARDEDHEADERS_ENABLED = "true"
-  ConnectionStrings__DefaultConnection = "Data Source=/data/videoparty.db"
-  # Jwt__Issuer and Jwt__Audience come from appsettings.json ("VideoParty").
-  # Jwt__Key must be set as a secret: fly secrets set Jwt__Key=<64-char random string>
+  ASPNETCORE_ENVIRONMENT = 'Production'
+  ASPNETCORE_FORWARDEDHEADERS_ENABLED = 'true'
+  ASPNETCORE_HTTP_PORTS = '8080'
+  ConnectionStrings__DefaultConnection = 'Data Source=/data/videoparty.db'
+
+[[mounts]]
+  source = 'data'
+  destination = '/data'
+  initial_size = '1gb'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   # SignalR connections require an always-available server. Keep one Machine
   # running, but do not create additional Machines automatically.
   min_machines_running = 1
 
 [[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
+  memory = '256mb'
+  cpu_kind = 'shared'
   cpus = 1
 
 [[mounts]]
