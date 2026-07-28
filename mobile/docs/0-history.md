@@ -163,3 +163,77 @@ To test: restart the API, reload both phones, cast on the organizer, play the no
 ### Added a Settings (gear) menu to the app header with "Reset identity"
 
 Clears the device credentials and returns to the registration screen, so a cloned phone can become its own user. Made SignalR resilient: infinite reconnect backoff (was: gave up after ~40s), restart on close/failed start, and a catch-up refetch of the open party's members/playlist on every reconnect and on app foreground — a phone left idle no longer goes permanently deaf to party events.
+
+## 2026-07-28
+
+### fly.io deployment
+
+Here's the complete deployment checklist — one-time setup, then zero maintenance:
+
+---
+
+One-time setup
+
+# Install Fly CLI if you don't have it
+
+winget install Superfly.Flyctl
+
+fly auth login
+
+# Register the app name and create the persistent volume
+
+fly launch --no-deploy # pick your app name, skip deploy for now
+fly volumes create data --size 1 --region ord
+
+# Set the JWT signing key (generate any 64-char random string)
+
+fly secrets set Jwt\_\_Key=$(openssl rand -hex 32)
+
+# First deploy
+
+fly deploy
+
+Every future deploy (after a git push or code change):
+fly deploy
+
+# Install Fly CLI if you don't have it
+
+winget install Superfly.Flyctl
+
+fly auth login
+
+# Register the app name and create the persistent volume
+
+fly launch --no-deploy # pick your app name, skip deploy for now
+fly volumes create data --size 1 --region ord
+
+# Set the JWT signing key (generate any 64-char random string)
+
+fly secrets set Jwt\_\_Key=$(openssl rand -hex 32)
+
+# First deploy
+
+fly deploy
+
+#### Every future deploy (after a git push or code change)
+
+fly deploy
+
+---
+
+What each piece does
+
+┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ File │ Purpose │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Dockerfile │ Multi-stage build: SDK image compiles, aspnet runtime image runs │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ .dockerignore │ Keeps mobile/ and build artifacts out of the Docker context (fast builds) │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ fly.toml │ 256 MB shared VM, 1 GB SQLite volume at /data, always-on (min_machines_running = 1 keeps SignalR alive) │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Program.cs change │ db.Database.Migrate() at startup — schema stays current automatically │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+The ASPNETCORE_FORWARDEDHEADERS_ENABLED=true env var is the key trick: it tells ASP.NET Core that Fly's proxy already handled TLS, so UseHttpsRedirection() doesn't
+loop.
