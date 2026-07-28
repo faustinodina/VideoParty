@@ -20,6 +20,8 @@ primary_region = "ord"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
+  # SignalR connections require an always-available server. Keep one Machine
+  # running, but do not create additional Machines automatically.
   min_machines_running = 1
 
 [[vm]]
@@ -31,3 +33,6 @@ primary_region = "ord"
   source = "data"
   destination = "/data"
   initial_size = "1gb"
+
+# Keep exactly one deployed Machine (this is Fly app state, not a fly.toml
+# setting): fly scale count 1

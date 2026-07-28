@@ -237,3 +237,61 @@ What each piece does
 
 The ASPNETCORE_FORWARDEDHEADERS_ENABLED=true env var is the key trick: it tells ASP.NET Core that Fly's proxy already handled TLS, so UseHttpsRedirection() doesn't
 loop.
+
+### Mobile modified to connect to fly.io production or local development
+
+What changed:
+
+package.json now has two new scripts:
+
+- npm run android:phone:prod — builds a release APK pointed at <https://videoparty.fly.dev>, installs to the phone
+- npm run android:emulator:prod — same for the emulator
+
+How the separation works:
+
+┌────────────────────┬───────────────────────────────────────────────────┬───────────────┐
+│ Script │ URL │ Build variant │
+├────────────────────┼───────────────────────────────────────────────────┼───────────────┤
+│ android:phone │ <http://192.168.1.3:5070> (from .env) │ debug │
+├────────────────────┼───────────────────────────────────────────────────┼───────────────┤
+│ android:phone:prod │ <https://videoparty.fly.dev> (inline via cross-env) │ release │
+└────────────────────┴───────────────────────────────────────────────────┴───────────────┘
+
+cross-env sets EXPO_PUBLIC_API_URL in the process environment before Metro starts. Process environment beats .env files, so there's no collision — dev builds
+always use the .env LAN IP and production builds use the fly.dev URL explicitly in the script.
+
+The Expo docs warned against using NODE_ENV / .env.production for this purpose because expo export always forces NODE_ENV=production, which would make that
+approach unreliable.
+
+✻ Baked for 5m 27s
+cross-env sets EXPO_PUBLIC_API_URL in the process environment before Metro starts. Process environment beats .env files, so there's no collision — dev builds
+always use the .env LAN IP and production builds use the fly.dev URL explicitly in the script.
+
+The Expo docs warned against using NODE_ENV / .env.production for this purpose because expo export always forces NODE_ENV=production, which would make that
+approach unreliable.
+
+Does this works with eas build command?
+
+● No — cross-env in an npm script has no effect on eas build. EAS runs its own build pipeline on Expo's servers (or locally with --local) and never invokes your npm
+scripts. It reads build configuration from eas.json, not package.json scripts.
+
+If you ever switch to EAS Build you'd need an eas.json:
+
+{
+"build": {
+"development": {
+"developmentClient": true,
+"distribution": "internal"
+},
+"production": {
+"env": {
+"EXPO_PUBLIC_API_URL": "<https://videoparty.fly.dev>"
+}
+}
+}
+}
+
+Then eas build --profile production would inline the fly.dev URL, and eas build --profile development would fall back to .env (your LAN IP).
+
+For now though — since you're building locally with expo run:android — the cross-env scripts are exactly right. If you add eas.json later, the two approaches can
+coexist without conflict.
