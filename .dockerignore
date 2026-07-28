@@ -1,0 +1,7 @@
+mobile/
+docs/
+**/.vs/
+**/obj/
+**/bin/
+*.slnx.user
+.git/
