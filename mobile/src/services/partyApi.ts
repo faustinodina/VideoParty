@@ -178,3 +178,8 @@ export function removeVideo(
 export function leaveParty(partyId: string): Promise<void> {
   return del(`/VP/parties/${partyId}/members/me`);
 }
+
+// Organizer-only: permanently deletes the party and all its data.
+export function closeParty(partyId: string): Promise<void> {
+  return del(`/VP/parties/${partyId}`);
+}

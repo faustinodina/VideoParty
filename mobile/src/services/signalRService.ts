@@ -28,6 +28,11 @@ export interface PlaybackIssue {
   message: string;
 }
 
+// Broadcast by the API when the organizer closes a party (see onPartyClosed).
+export interface PartyClosed {
+  partyId: string;
+}
+
 class SignalRService {
   private connection: HubConnection | null = null;
   // Remembered so we can re-join the party group after an automatic reconnect.
@@ -244,6 +249,13 @@ class SignalRService {
   onPlaybackIssue(callback: (issue: PlaybackIssue) => void) {
     this.on("PlaybackIssue", callback);
     return () => this.off("PlaybackIssue", callback);
+  }
+
+  // Broadcast by the API when the organizer closes the party permanently;
+  // received by all members including the organizer.
+  onPartyClosed(callback: (event: PartyClosed) => void) {
+    this.on("PartyClosed", callback);
+    return () => this.off("PartyClosed", callback);
   }
 
   async disconnect() {

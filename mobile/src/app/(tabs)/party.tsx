@@ -15,6 +15,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
+  closeParty,
   leaveParty,
   removeMember,
   selectActiveParty,
@@ -32,6 +33,7 @@ export default function PartyScreen() {
   // clipboard because the browser has no share dialog.
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
 
   const shareParty = async () => {
     if (!activeParty) return;
@@ -66,6 +68,30 @@ export default function PartyScreen() {
     } catch {
       // Dismissing the share dialog rejects on some platforms; not an error.
     }
+  };
+
+  const confirmCloseParty = () => {
+    if (!activeParty) return;
+    Alert.alert(
+      'Close party?',
+      `This will permanently delete "${activeParty.name}" and remove all members and videos. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close Party',
+          style: 'destructive',
+          onPress: async () => {
+            setCloseError(null);
+            try {
+              await dispatch(closeParty(activeParty.partyId)).unwrap();
+              router.navigate('/');
+            } catch {
+              setCloseError('Could not close the party. Check your connection and try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const exitParty = () => {
@@ -137,13 +163,23 @@ export default function PartyScreen() {
             </Text>
             <View style={styles.actionRow}>
               {activeParty.role === 'organizer' ? (
-                <Button
-                  mode="contained"
-                  icon="share-variant"
-                  onPress={shareParty}
-                >
-                  Share Party
-                </Button>
+                <>
+                  <Button
+                    mode="contained"
+                    icon="share-variant"
+                    onPress={shareParty}
+                  >
+                    Share Party
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    icon="close-circle-outline"
+                    textColor={theme.colors.error}
+                    onPress={confirmCloseParty}
+                  >
+                    Close Party
+                  </Button>
+                </>
               ) : (
                 <Button
                   mode="contained"
@@ -167,6 +203,11 @@ export default function PartyScreen() {
             {shareError && (
               <Text variant="bodySmall" style={{ color: theme.colors.error }}>
                 {shareError}
+              </Text>
+            )}
+            {closeError && (
+              <Text variant="bodySmall" style={{ color: theme.colors.error }}>
+                {closeError}
               </Text>
             )}
             <Text variant="titleMedium">Members</Text>

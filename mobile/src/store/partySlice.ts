@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 import {
   addVideo as addVideoApi,
+  closeParty as closePartyApi,
   createParty as createPartyApi,
   getMembers,
   getUserParties,
@@ -14,7 +15,7 @@ import {
   removeMember as removeMemberApi,
   removeVideo as removeVideoApi,
 } from "@/services/partyApi";
-import signalR, { PlaybackIssue } from "@/services/signalRService";
+import signalR, { PartyClosed, PlaybackIssue } from "@/services/signalRService";
 import { getUserName } from "@/services/userIdentity";
 import type { RootState } from "@/store";
 
@@ -153,6 +154,19 @@ export const removeVideo = createAsyncThunk(
   async (video: PartyVideo) => {
     await removeVideoApi(video.partyId, video.partyVideoId);
     return video;
+  }
+);
+
+// The organizer permanently closes a party. The API broadcasts PartyClosed
+// to the group (including the organizer) before deleting, so every client
+// cleans up via the partyClosed reducer; this thunk also leaves the SignalR
+// group so an automatic reconnect doesn't re-join a group that no longer exists.
+export const closeParty = createAsyncThunk(
+  "party/close",
+  async (partyId: string) => {
+    await closePartyApi(partyId);
+    await signalR.leaveParty(partyId);
+    return partyId;
   }
 );
 
@@ -332,6 +346,24 @@ const partySlice = createSlice({
     identityCleared() {
       return initialState;
     },
+    // Dispatched from the app-level SignalR subscription when the organizer
+    // closes the party. Received by all members (including the organizer,
+    // whose closeParty.fulfilled handles cleanup first — this is idempotent).
+    partyClosed(state, action: PayloadAction<PartyClosed>) {
+      const partyId = action.payload.partyId.toLowerCase();
+      state.parties = state.parties.filter(
+        (p) => p.partyId.toLowerCase() !== partyId
+      );
+      if (state.activePartyId?.toLowerCase() === partyId) {
+        state.activePartyId = null;
+        state.members = [];
+        state.videos = [];
+        state.playbackIssue = null;
+      }
+      if (state.videoTargetPartyId?.toLowerCase() === partyId) {
+        state.videoTargetPartyId = null;
+      }
+    },
     // This device's user was removed by the organizer: drop the party from
     // the list and close it if it is the one currently open.
     removedFromParty(state, action: PayloadAction<PartyMember>) {
@@ -407,6 +439,23 @@ const partySlice = createSlice({
           (v) => v.partyVideoId !== action.payload.partyVideoId
         );
       })
+      .addCase(closeParty.fulfilled, (state, action) => {
+        // Same cleanup as leaveParty: drop the party and close it if open.
+        // The PartyClosed SignalR event may have already done this; idempotent.
+        const partyId = action.payload.toLowerCase();
+        state.parties = state.parties.filter(
+          (p) => p.partyId.toLowerCase() !== partyId
+        );
+        if (state.activePartyId?.toLowerCase() === partyId) {
+          state.activePartyId = null;
+          state.members = [];
+          state.videos = [];
+          state.playbackIssue = null;
+        }
+        if (state.videoTargetPartyId?.toLowerCase() === partyId) {
+          state.videoTargetPartyId = null;
+        }
+      })
       .addCase(leaveParty.fulfilled, (state, action) => {
         // Same cleanup as removedFromParty: drop the party and close it if
         // it is the one currently open.
@@ -480,6 +529,7 @@ export const {
   identityCleared,
   memberJoined,
   memberRemoved,
+  partyClosed,
   playbackIssueReceived,
   removedFromParty,
   videoAdded,

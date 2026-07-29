@@ -463,6 +463,35 @@ namespace VideoParty.Api.Controllers
       return NoContent();
     }
 
+    // The organizer permanently deletes the party and all its data.
+    // PartyClosed is broadcast before the delete so every client can react
+    // before the party disappears from the database.
+    [HttpDelete("parties/{partyId:guid}")]
+    public async Task<IActionResult> CloseParty(Guid partyId)
+    {
+      var party = await _db.Parties.FindAsync(partyId);
+      if (party is null)
+      {
+        return NotFound($"Party '{partyId}' was not found.");
+      }
+
+      if (party.OrganizerUserId != CallerUserId)
+      {
+        return StatusCode(StatusCodes.Status403Forbidden,
+            "Only the organizer can close this party.");
+      }
+
+      await _hub.Clients.Group(partyId.ToString()).SendAsync("PartyClosed", new
+      {
+        PartyId = partyId
+      });
+
+      _db.Parties.Remove(party);
+      await _db.SaveChangesAsync();
+
+      return NoContent();
+    }
+
     // Only the party's organizer may remove members.
     [HttpDelete("parties/{partyId:guid}/members/{id:guid}")]
     public async Task<IActionResult> RemoveMember(Guid partyId, Guid id)

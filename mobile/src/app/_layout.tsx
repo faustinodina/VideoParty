@@ -32,6 +32,7 @@ import {
   identityCleared,
   memberJoined,
   memberRemoved,
+  partyClosed,
   playbackIssueReceived,
   refreshActiveParty,
   removedFromParty,
@@ -131,6 +132,13 @@ export default function RootLayout() {
       store.dispatch(playbackIssueReceived(issue));
     });
 
+    const unsubscribePartyClosed = signalR.onPartyClosed(async (event) => {
+      store.dispatch(partyClosed(event));
+      // Leave the group so an automatic reconnect doesn't re-join a group
+      // that no longer exists on the server.
+      await signalR.leaveParty(event.partyId);
+    });
+
     const unsubscribeRemoved = signalR.onMemberRemoved(async (member) => {
       // Being removed yourself closes the party; anyone else just leaves
       // the members list.
@@ -188,6 +196,7 @@ export default function RootLayout() {
       unsubscribeVideoAdded();
       unsubscribeVideoRemoved();
       unsubscribePlaybackIssue();
+      unsubscribePartyClosed();
       unsubscribeRemoved();
       unsubscribeReset();
       signalR.disconnect();
