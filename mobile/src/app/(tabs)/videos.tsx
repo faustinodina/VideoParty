@@ -30,7 +30,9 @@ import {
   clearPlaybackIssue,
   removeVideo,
   selectActiveParty,
+  unvoteVideo,
   videoRequested,
+  voteVideo,
 } from '@/store/partySlice';
 
 export default function VideosScreen() {
@@ -366,6 +368,21 @@ export default function VideosScreen() {
                   added by {addedBy(item.addedByUserId)}
                 </Text>
               </View>
+              <View style={styles.voteBlock}>
+                <IconButton
+                  icon={item.hasVoted ? 'thumb-up' : 'thumb-up-outline'}
+                  iconColor={item.hasVoted ? theme.colors.primary : undefined}
+                  size={20}
+                  onPress={() =>
+                    item.hasVoted
+                      ? dispatch(unvoteVideo(item))
+                      : dispatch(voteVideo(item))
+                  }
+                />
+                <Text variant="labelSmall" style={styles.voteCount}>
+                  {item.voteCount}
+                </Text>
+              </View>
               {isOrganizer && (
                 <IconButton
                   icon="delete-outline"
@@ -463,6 +480,14 @@ const styles = StyleSheet.create({
   videoInfo: {
     flex: 1,
     gap: Spacing.half,
+  },
+  voteBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voteCount: {
+    textAlign: 'center',
+    marginTop: -Spacing.two,
   },
   empty: {
     textAlign: 'center',

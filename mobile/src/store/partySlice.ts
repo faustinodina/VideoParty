@@ -14,8 +14,14 @@ import {
   registerMember,
   removeMember as removeMemberApi,
   removeVideo as removeVideoApi,
+  unvoteVideo as unvoteVideoApi,
+  voteVideo as voteVideoApi,
 } from "@/services/partyApi";
-import signalR, { PartyClosed, PlaybackIssue } from "@/services/signalRService";
+import signalR, {
+  PartyClosed,
+  PlaybackIssue,
+  VideoVoteChanged,
+} from "@/services/signalRService";
 import { getUserName } from "@/services/userIdentity";
 import type { RootState } from "@/store";
 
@@ -72,18 +78,28 @@ const initialState: PartyState = {
 };
 
 
-// Inserts keeping play order (position, createdAt breaking ties, mirroring
-// the API's ordering). Skips videos already known from the fetched snapshot:
-// an add can arrive over SignalR right after it was included in getVideos.
+// Sort order: most-voted first, ties broken by addition order (position,
+// then createdAt), mirroring the API's GetVideos ordering.
+function compareVideos(a: PartyVideo, b: PartyVideo): number {
+  const voteDiff = b.voteCount - a.voteCount;
+  if (voteDiff !== 0) return voteDiff;
+  const posDiff = a.position - b.position;
+  if (posDiff !== 0) return posDiff;
+  return a.createdAt < b.createdAt ? -1 : 1;
+}
+
+// Returns a new sorted array; safe to assign directly to Redux state.
+function sortVideos(videos: PartyVideo[]): PartyVideo[] {
+  return [...videos].sort(compareVideos);
+}
+
+// Inserts a new video in sorted order. Skips duplicates from the fetched
+// snapshot that arrive over SignalR right after getVideos.
 function insertVideo(videos: PartyVideo[], video: PartyVideo) {
   if (videos.some((v) => v.partyVideoId === video.partyVideoId)) {
     return;
   }
-  const index = videos.findIndex(
-    (v) =>
-      v.position > video.position ||
-      (v.position === video.position && v.createdAt > video.createdAt)
-  );
+  const index = videos.findIndex((v) => compareVideos(video, v) < 0);
   if (index === -1) {
     videos.push(video);
   } else {
@@ -154,6 +170,24 @@ export const removeVideo = createAsyncThunk(
   async (video: PartyVideo) => {
     await removeVideoApi(video.partyId, video.partyVideoId);
     return video;
+  }
+);
+
+// Casts the current member's up-vote for a video. The API broadcasts
+// VideoVoteChanged to update all clients' vote counts; this thunk's fulfilled
+// result also sets hasVoted so the voter's UI reacts without waiting for the echo.
+export const voteVideo = createAsyncThunk(
+  "party/voteVideo",
+  async (video: PartyVideo) => {
+    return voteVideoApi(video.partyId, video.partyVideoId);
+  }
+);
+
+// Removes the current member's up-vote from a video.
+export const unvoteVideo = createAsyncThunk(
+  "party/unvoteVideo",
+  async (video: PartyVideo) => {
+    return unvoteVideoApi(video.partyId, video.partyVideoId);
   }
 );
 
@@ -346,6 +380,26 @@ const partySlice = createSlice({
     identityCleared() {
       return initialState;
     },
+    // Dispatched from the app-level SignalR subscription when any member
+    // votes or unvotes a video. Updates the vote count and re-sorts. hasVoted
+    // is intentionally not updated here — the voter's own hasVoted comes from
+    // their voteVideo/unvoteVideo thunk result; other clients' hasVoted is
+    // unaffected by someone else's vote.
+    videoVoteChanged(state, action: PayloadAction<VideoVoteChanged>) {
+      if (
+        state.activePartyId &&
+        action.payload.partyId.toLowerCase() ===
+          state.activePartyId.toLowerCase()
+      ) {
+        const video = state.videos.find(
+          (v) => v.partyVideoId === action.payload.partyVideoId
+        );
+        if (video) {
+          video.voteCount = action.payload.voteCount;
+          state.videos = sortVideos(state.videos);
+        }
+      }
+    },
     // Dispatched from the app-level SignalR subscription when the organizer
     // closes the party. Received by all members (including the organizer,
     // whose closeParty.fulfilled handles cleanup first — this is idempotent).
@@ -438,6 +492,26 @@ const partySlice = createSlice({
         state.videos = state.videos.filter(
           (v) => v.partyVideoId !== action.payload.partyVideoId
         );
+      })
+      .addCase(voteVideo.fulfilled, (state, action) => {
+        const video = state.videos.find(
+          (v) => v.partyVideoId === action.payload.partyVideoId
+        );
+        if (video) {
+          video.voteCount = action.payload.voteCount;
+          video.hasVoted = action.payload.hasVoted;
+          state.videos = sortVideos(state.videos);
+        }
+      })
+      .addCase(unvoteVideo.fulfilled, (state, action) => {
+        const video = state.videos.find(
+          (v) => v.partyVideoId === action.payload.partyVideoId
+        );
+        if (video) {
+          video.voteCount = action.payload.voteCount;
+          video.hasVoted = action.payload.hasVoted;
+          state.videos = sortVideos(state.videos);
+        }
       })
       .addCase(closeParty.fulfilled, (state, action) => {
         // Same cleanup as leaveParty: drop the party and close it if open.
@@ -534,6 +608,7 @@ export const {
   removedFromParty,
   videoAdded,
   videoRemoved,
+  videoVoteChanged,
   videoRequested,
   videoShared,
 } = partySlice.actions;

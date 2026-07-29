@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace VideoParty.Model.Models
@@ -29,6 +30,10 @@ namespace VideoParty.Model.Models
     // Order of the video within the party's playlist; lower plays first.
     // Gaps are fine, only the relative order matters.
     public required int Position { get; set; }
+
+    // Votes cast by party members for this video (populated when queried
+    // via Include or subquery projection; not fetched by default).
+    public ICollection<PartyVideoVote> Votes { get; set; } = [];
 
     // Set by ApplicationDbContext on save; not `required` on purpose.
     public DateTime CreatedAt { get; set; }

@@ -38,6 +38,7 @@ import {
   removedFromParty,
   videoAdded,
   videoRemoved,
+  videoVoteChanged,
   videoShared,
 } from "@/store/partySlice";
 
@@ -132,6 +133,10 @@ export default function RootLayout() {
       store.dispatch(playbackIssueReceived(issue));
     });
 
+    const unsubscribeVideoVoteChanged = signalR.onVideoVoteChanged((event) => {
+      store.dispatch(videoVoteChanged(event));
+    });
+
     const unsubscribePartyClosed = signalR.onPartyClosed(async (event) => {
       store.dispatch(partyClosed(event));
       // Leave the group so an automatic reconnect doesn't re-join a group
@@ -196,6 +201,7 @@ export default function RootLayout() {
       unsubscribeVideoAdded();
       unsubscribeVideoRemoved();
       unsubscribePlaybackIssue();
+      unsubscribeVideoVoteChanged();
       unsubscribePartyClosed();
       unsubscribeRemoved();
       unsubscribeReset();

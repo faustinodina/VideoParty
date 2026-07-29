@@ -20,6 +20,7 @@ namespace VideoParty.DataAccess.Data
     public DbSet<PartyMember> PartyMembers { get; set; }
     public DbSet<PartyInvitation> PartyInvitations { get; set; }
     public DbSet<PartyVideo> PartyVideos { get; set; }
+    public DbSet<PartyVideoVote> PartyVideoVotes { get; set; }
     public DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -35,6 +36,18 @@ namespace VideoParty.DataAccess.Data
       // Playlists are always read per party in play order.
       modelBuilder.Entity<PartyVideo>()
           .HasIndex(v => new { v.PartyId, v.Position });
+
+      // Each member can vote for a video at most once.
+      modelBuilder.Entity<PartyVideoVote>()
+          .HasIndex(v => new { v.PartyVideoId, v.UserId })
+          .IsUnique();
+
+      // Deleting a video removes all its votes.
+      modelBuilder.Entity<PartyVideoVote>()
+          .HasOne(v => v.Video)
+          .WithMany(v => v.Votes)
+          .HasForeignKey(v => v.PartyVideoId)
+          .OnDelete(DeleteBehavior.Cascade);
 
       // SQLite stores DateTime as TEXT with no kind, so values read back are
       // Kind=Unspecified and would serialize without the Z suffix. All stored

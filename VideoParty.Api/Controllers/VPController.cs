@@ -303,9 +303,10 @@ namespace VideoParty.Api.Controllers
       return NoContent();
     }
 
-    // The party's playlist in play order.
+    // The party's playlist sorted by votes (most voted first), then by
+    // addition order within the same vote count.
     [HttpGet("parties/{partyId:guid}/videos")]
-    public async Task<ActionResult<IEnumerable<PartyVideo>>> GetVideos(Guid partyId)
+    public async Task<ActionResult<IEnumerable<PartyVideoSummary>>> GetVideos(Guid partyId)
     {
       var partyExists = await _db.Parties.AnyAsync(p => p.PartyId == partyId);
       if (!partyExists)
@@ -313,12 +314,33 @@ namespace VideoParty.Api.Controllers
         return NotFound($"Party '{partyId}' was not found.");
       }
 
-      // CreatedAt breaks the ties concurrent adds can produce (see AddVideo).
-      return await _db.PartyVideos
+      var userId = CallerUserId;
+      var videos = await _db.PartyVideos
           .Where(v => v.PartyId == partyId)
-          .OrderBy(v => v.Position)
-          .ThenBy(v => v.CreatedAt)
+          .Select(v => new
+          {
+            v.PartyVideoId,
+            v.PartyId,
+            v.AddedByUserId,
+            v.Url,
+            v.Title,
+            v.ThumbnailUrl,
+            v.Position,
+            VoteCount = v.Votes.Count(),
+            HasVoted = v.Votes.Any(vote => vote.UserId == userId),
+            v.CreatedAt,
+            v.UpdatedAt
+          })
           .ToListAsync();
+
+      return videos
+          .OrderByDescending(v => v.VoteCount)
+          .ThenBy(v => v.Position)
+          .ThenBy(v => v.CreatedAt)
+          .Select(v => new PartyVideoSummary(
+              v.PartyVideoId, v.PartyId, v.AddedByUserId, v.Url, v.Title,
+              v.ThumbnailUrl, v.Position, v.VoteCount, v.HasVoted, v.CreatedAt, v.UpdatedAt))
+          .ToList();
     }
 
     [HttpGet("parties/{partyId:guid}/videos/{id:guid}", Name = nameof(GetVideo))]
@@ -411,6 +433,8 @@ namespace VideoParty.Api.Controllers
         video.Title,
         video.ThumbnailUrl,
         video.Position,
+        VoteCount = 0,
+        HasVoted = false,
         video.CreatedAt,
         video.UpdatedAt
       });
@@ -461,6 +485,96 @@ namespace VideoParty.Api.Controllers
       });
 
       return NoContent();
+    }
+
+    // Any party member can vote for a video once. Idempotent: voting again
+    // returns the current state without duplicating the vote.
+    [HttpPost("parties/{partyId:guid}/videos/{videoId:guid}/votes")]
+    public async Task<ActionResult<VideoVoteResult>> VoteVideo(Guid partyId, Guid videoId)
+    {
+      var video = await _db.PartyVideos.FindAsync(videoId);
+      if (video is null || video.PartyId != partyId)
+      {
+        return NotFound($"Video '{videoId}' was not found in party '{partyId}'.");
+      }
+
+      var userId = CallerUserId;
+      var isMember = await _db.PartyMembers
+          .AnyAsync(m => m.PartyId == partyId && m.UserId == userId);
+      if (!isMember)
+      {
+        return StatusCode(StatusCodes.Status403Forbidden,
+            "Only members of this party can vote.");
+      }
+
+      var existing = await _db.PartyVideoVotes
+          .FirstOrDefaultAsync(v => v.PartyVideoId == videoId && v.UserId == userId);
+
+      if (existing is null)
+      {
+        _db.PartyVideoVotes.Add(new PartyVideoVote
+        {
+          PartyVideoVoteId = Guid.NewGuid(),
+          PartyVideoId = videoId,
+          UserId = userId
+        });
+        await _db.SaveChangesAsync();
+
+        var voteCount = await _db.PartyVideoVotes.CountAsync(v => v.PartyVideoId == videoId);
+        await _hub.Clients.Group(partyId.ToString()).SendAsync("VideoVoteChanged", new
+        {
+          PartyVideoId = videoId,
+          PartyId = partyId,
+          VoteCount = voteCount,
+          VoterUserId = userId,
+          Voted = true
+        });
+
+        return new VideoVoteResult(videoId, partyId, voteCount, true);
+      }
+
+      // Already voted: return current count without re-broadcasting.
+      var currentCount = await _db.PartyVideoVotes.CountAsync(v => v.PartyVideoId == videoId);
+      return new VideoVoteResult(videoId, partyId, currentCount, true);
+    }
+
+    // Removes the caller's vote from a video. Idempotent: calling when not
+    // voted returns the current state without an error.
+    [HttpDelete("parties/{partyId:guid}/videos/{videoId:guid}/votes/me")]
+    public async Task<ActionResult<VideoVoteResult>> UnvoteVideo(Guid partyId, Guid videoId)
+    {
+      var videoExists = await _db.PartyVideos
+          .AnyAsync(v => v.PartyVideoId == videoId && v.PartyId == partyId);
+      if (!videoExists)
+      {
+        return NotFound($"Video '{videoId}' was not found in party '{partyId}'.");
+      }
+
+      var userId = CallerUserId;
+      var vote = await _db.PartyVideoVotes
+          .FirstOrDefaultAsync(v => v.PartyVideoId == videoId && v.UserId == userId);
+
+      if (vote is not null)
+      {
+        _db.PartyVideoVotes.Remove(vote);
+        await _db.SaveChangesAsync();
+
+        var voteCount = await _db.PartyVideoVotes.CountAsync(v => v.PartyVideoId == videoId);
+        await _hub.Clients.Group(partyId.ToString()).SendAsync("VideoVoteChanged", new
+        {
+          PartyVideoId = videoId,
+          PartyId = partyId,
+          VoteCount = voteCount,
+          VoterUserId = userId,
+          Voted = false
+        });
+
+        return new VideoVoteResult(videoId, partyId, voteCount, false);
+      }
+
+      // Not voted: return current count without broadcasting.
+      var currentCount = await _db.PartyVideoVotes.CountAsync(v => v.PartyVideoId == videoId);
+      return new VideoVoteResult(videoId, partyId, currentCount, false);
     }
 
     // The organizer permanently deletes the party and all its data.
@@ -560,4 +674,15 @@ namespace VideoParty.Api.Controllers
 
   public record PartySummary(
       Guid PartyId, string Name, PartyRole Role, DateTime CreatedAt, Guid OrganizerUserId);
+
+  // PartyVideo with vote count and per-caller voted flag, returned by GetVideos.
+  public record PartyVideoSummary(
+      Guid PartyVideoId, Guid PartyId, Guid AddedByUserId,
+      string Url, string? Title, string? ThumbnailUrl,
+      int Position, int VoteCount, bool HasVoted,
+      DateTime CreatedAt, DateTime UpdatedAt);
+
+  // Returned by VoteVideo and UnvoteVideo so the caller gets the updated count.
+  public record VideoVoteResult(
+      Guid PartyVideoId, Guid PartyId, int VoteCount, bool HasVoted);
 }

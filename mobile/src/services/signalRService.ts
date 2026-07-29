@@ -33,6 +33,15 @@ export interface PartyClosed {
   partyId: string;
 }
 
+// Broadcast by the API when any member votes or unvotes a video.
+export interface VideoVoteChanged {
+  partyVideoId: string;
+  partyId: string;
+  voteCount: number;
+  voterUserId: string;
+  voted: boolean;
+}
+
 class SignalRService {
   private connection: HubConnection | null = null;
   // Remembered so we can re-join the party group after an automatic reconnect.
@@ -256,6 +265,13 @@ class SignalRService {
   onPartyClosed(callback: (event: PartyClosed) => void) {
     this.on("PartyClosed", callback);
     return () => this.off("PartyClosed", callback);
+  }
+
+  // Broadcast by the API when any member votes or unvotes a video; received
+  // by all members including the voter (whose hasVoted is already set locally).
+  onVideoVoteChanged(callback: (event: VideoVoteChanged) => void) {
+    this.on("VideoVoteChanged", callback);
+    return () => this.off("VideoVoteChanged", callback);
   }
 
   async disconnect() {

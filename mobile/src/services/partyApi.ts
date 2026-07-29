@@ -38,8 +38,7 @@ export interface PartyMember {
   updatedAt: string;
 }
 
-// Mirrors the PartyVideo entity; also the VideoAdded SignalR payload,
-// which the API broadcasts with the same shape.
+// Mirrors PartyVideoSummary returned by GetVideos and the VideoAdded event.
 export interface PartyVideo {
   partyVideoId: string;
   partyId: string;
@@ -50,9 +49,21 @@ export interface PartyVideo {
   thumbnailUrl: string | null;
   /** Playlist order; lower plays first, gaps allowed. */
   position: number;
+  /** Number of member up-votes on this video. */
+  voteCount: number;
+  /** Whether the current device's user has voted for this video. */
+  hasVoted: boolean;
   /** ISO 8601 UTC, stamped by the API. */
   createdAt: string;
   updatedAt: string;
+}
+
+// Returned by voteVideo and unvoteVideo.
+export interface VideoVoteResult {
+  partyVideoId: string;
+  partyId: string;
+  voteCount: number;
+  hasVoted: boolean;
 }
 
 // Mirrors PartyInvitation returned by POST /VP/parties/{partyId}/invitations.
@@ -182,4 +193,26 @@ export function leaveParty(partyId: string): Promise<void> {
 // Organizer-only: permanently deletes the party and all its data.
 export function closeParty(partyId: string): Promise<void> {
   return del(`/VP/parties/${partyId}`);
+}
+
+// Adds the caller's up-vote to a video. Idempotent if already voted.
+export function voteVideo(
+  partyId: string,
+  partyVideoId: string
+): Promise<VideoVoteResult> {
+  return post<VideoVoteResult>(
+    `/VP/parties/${partyId}/videos/${partyVideoId}/votes`,
+    {}
+  );
+}
+
+// Removes the caller's up-vote from a video. Idempotent if not voted.
+export function unvoteVideo(
+  partyId: string,
+  partyVideoId: string
+): Promise<VideoVoteResult> {
+  return request<VideoVoteResult>(
+    `/VP/parties/${partyId}/videos/${partyVideoId}/votes/me`,
+    { method: "DELETE" }
+  );
 }
