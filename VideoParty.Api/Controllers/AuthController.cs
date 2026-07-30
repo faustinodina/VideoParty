@@ -62,6 +62,9 @@ namespace VideoParty.Api.Controllers
         return Unauthorized("Unknown user id or wrong secret.");
       }
 
+      user.LastAccessDate = DateTime.UtcNow;
+      await _db.SaveChangesAsync();
+
       var expiresAt = DateTime.UtcNow.Add(TokenLifetime);
       var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
 

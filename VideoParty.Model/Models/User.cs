@@ -16,6 +16,10 @@ namespace VideoParty.Model.Models
     // SHA-256 of the device secret, uppercase hex.
     public required string SecretHash { get; set; }
 
+    public DateTime? LastAccessDate { get; set; }
+    public int PartiesCreated { get; set; }
+    public int PartiesJoined { get; set; }
+
     // Set by ApplicationDbContext on save; not `required` on purpose.
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

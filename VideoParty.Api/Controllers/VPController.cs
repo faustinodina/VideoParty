@@ -141,6 +141,9 @@ namespace VideoParty.Api.Controllers
         DisplayName = request.OrganizerName
       };
 
+      var organizer = await _db.Users.FindAsync(party.OrganizerUserId);
+      organizer!.PartiesCreated++;
+
       _db.Parties.Add(party);
       _db.PartyMembers.Add(organizerMember);
       await _db.SaveChangesAsync();
@@ -263,8 +266,11 @@ namespace VideoParty.Api.Controllers
         InvitationId = code
       };
 
-      // One SaveChanges: the member is admitted and the invitation consumed
-      // in the same transaction.
+      var joiningUser = await _db.Users.FindAsync(userId);
+      joiningUser!.PartiesJoined++;
+
+      // One SaveChanges: the member is admitted, the invitation consumed,
+      // and the counter incremented in the same transaction.
       invitation.UsedAt = DateTime.UtcNow;
       _db.PartyMembers.Add(member);
       try
