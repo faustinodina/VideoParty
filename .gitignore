@@ -45,6 +45,11 @@ yarn-error.*
 .env.*
 appsettings.*.local.json
 
+# Android release signing — never commit keystore or credentials
+*.keystore
+*.jks
+mobile/keystore.properties
+
 # OS
 .DS_Store
 Thumbs.db

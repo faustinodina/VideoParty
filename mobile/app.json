@@ -27,6 +27,7 @@
     "plugins": [
       "expo-router",
       "./plugins/withDevBuildConfig",
+      "./plugins/withReleaseKeystore",
       [
         "react-native-google-cast",
         {
