@@ -1,8 +1,12 @@
+import Constants from 'expo-constants';
 import { useState } from 'react';
 import { Alert, StyleSheet } from 'react-native';
-import { IconButton, Menu, useTheme } from 'react-native-paper';
+import { Divider, IconButton, Menu, useTheme } from 'react-native-paper';
 
 import { resetIdentity } from '@/services/userIdentity';
+
+const version = Constants.expoConfig?.version ?? '?';
+const commit = Constants.expoConfig?.extra?.gitCommit ?? '?';
 
 /**
  * Gear button on the app header opening the settings menu. Holds app-level
@@ -50,6 +54,12 @@ export function SettingsMenu() {
         leadingIcon="account-off"
         title="Reset identity"
         onPress={confirmReset}
+      />
+      <Divider />
+      <Menu.Item
+        leadingIcon="information-outline"
+        title={`v${version} · ${commit}`}
+        disabled
       />
     </Menu>
   );
