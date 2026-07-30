@@ -211,7 +211,7 @@ export default function PartyScreen() {
                 {closeError}
               </Text>
             )}
-            <Text variant="titleMedium">Members</Text>
+            <Text variant="titleMedium">Guests</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -238,7 +238,7 @@ export default function PartyScreen() {
             variant="bodyMedium"
             style={[styles.empty, { color: theme.colors.onSurfaceVariant }]}
           >
-            No members yet. New joins will appear here in real time.
+            No guests yet. New joins will appear here in real time.
           </Text>
         }
       />
