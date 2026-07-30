@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
@@ -149,6 +150,19 @@ namespace VideoParty.Api.Controllers
       await _db.SaveChangesAsync();
 
       return CreatedAtAction(nameof(GetParty), new { id = party.PartyId }, party);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("version")]
+    public ActionResult<BuildVersion> GetVersion()
+    {
+      var informational = Assembly.GetExecutingAssembly()
+          .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+          ?.InformationalVersion ?? "unknown";
+      var commit = informational.Contains('+')
+          ? informational[(informational.IndexOf('+') + 1)..]
+          : informational;
+      return new BuildVersion(informational, commit);
     }
 
     // Email clients only auto-link https:// URLs, so the share message points
@@ -691,6 +705,8 @@ namespace VideoParty.Api.Controllers
       return NoContent();
     }
   }
+
+  public record BuildVersion(string Version, string Commit);
 
   public record CreatePartyRequest(string Name, string OrganizerName);
 
