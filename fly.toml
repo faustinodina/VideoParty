@@ -33,10 +33,5 @@ primary_region = 'ord'
   cpu_kind = 'shared'
   cpus = 1
 
-[[mounts]]
-  source = "data"
-  destination = "/data"
-  initial_size = "1gb"
-
 # Keep exactly one deployed Machine (this is Fly app state, not a fly.toml
 # setting): fly scale count 1

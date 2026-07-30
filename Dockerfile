@@ -12,6 +12,10 @@ COPY VideoParty.Model/ VideoParty.Model/
 COPY VideoParty.DataAccess/ VideoParty.DataAccess/
 COPY VideoParty.Api/ VideoParty.Api/
 COPY .git/ .git/
+# objects/ is excluded from .dockerignore to keep the context small; recreate
+# the empty directory so git recognises .git/ as a valid repository and
+# rev-parse can read the commit hash from the ref files.
+RUN mkdir -p .git/objects
 RUN dotnet publish VideoParty.Api/VideoParty.Api.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
