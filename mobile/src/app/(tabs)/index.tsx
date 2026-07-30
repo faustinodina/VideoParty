@@ -59,7 +59,7 @@ export default function PartiesScreen() {
       await dispatch(createParty(name)).unwrap();
       setPartyName("");
       setFormMode("none");
-      router.navigate("/party");
+      router.navigate("/videos");
     } catch {
       // Failure is surfaced via createError from the store.
     }
@@ -86,7 +86,7 @@ export default function PartiesScreen() {
       await dispatch(joinParty(code)).unwrap();
       setInviteInput("");
       setFormMode("none");
-      router.navigate("/party");
+      router.navigate("/videos");
     } catch {
       // Failure is surfaced via joinError from the store.
     }
@@ -94,7 +94,7 @@ export default function PartiesScreen() {
 
   const openExisting = (partyId: string) => {
     dispatch(openParty(partyId));
-    router.navigate("/party");
+    router.navigate("/videos");
   };
 
   // Leaving needs confirmation: getting back in takes a new invitation.

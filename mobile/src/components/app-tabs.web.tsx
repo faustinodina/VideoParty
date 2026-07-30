@@ -24,7 +24,7 @@ export default function AppTabs() {
             <TabButton>Parties</TabButton>
           </TabTrigger>
           <TabTrigger name="party" href="/party" asChild>
-            <TabButton>Party</TabButton>
+            <TabButton>Guests</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
