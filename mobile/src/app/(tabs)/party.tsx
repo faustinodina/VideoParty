@@ -12,6 +12,7 @@ import {
 
 import AppHeader from '@/components/app-header';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { API_BASE_URL } from '@/constants/config';
 import { createInvitation } from '@/services/partyApi';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -51,7 +52,7 @@ export default function PartyScreen() {
 
     const message =
       `Join my party "${activeParty.name}" on VideoParty!\n` +
-      `Tap to join: videoparty://join/${invitationId}\n` +
+      `Tap to join: ${API_BASE_URL}/vp/join/${invitationId}\n` +
       `Or type this invite code into Join Party: ${invitationId}`;
 
     try {

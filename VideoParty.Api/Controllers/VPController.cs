@@ -148,6 +148,38 @@ namespace VideoParty.Api.Controllers
       return CreatedAtAction(nameof(GetParty), new { id = party.PartyId }, party);
     }
 
+    // Email clients only auto-link https:// URLs, so the share message points
+    // here instead of directly to the videoparty:// scheme. The page redirects
+    // to the app; if it isn't installed the invite code is shown for manual entry.
+    [AllowAnonymous]
+    [HttpGet("join/{code}")]
+    public ContentResult JoinRedirect(string code)
+    {
+      var safeCode = System.Text.Encodings.Web.HtmlEncoder.Default
+          .Encode(NormalizeInvitationCode(code));
+      var html = $$"""
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Join VideoParty</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { font-family: system-ui, sans-serif; text-align: center; padding: 3rem 1.5rem; color: #1a1a1a; }
+              code { display: inline-block; font-size: 1.75rem; letter-spacing: 0.2em; font-weight: bold; margin: 1rem 0; }
+            </style>
+          </head>
+          <body>
+            <p>Opening VideoParty&hellip;</p>
+            <p>If the app didn&rsquo;t open, enter this invite code in <strong>Join Party</strong>:</p>
+            <p><code>{{safeCode}}</code></p>
+            <script>window.location.replace("videoparty://join/{{safeCode}}");</script>
+          </body>
+          </html>
+          """;
+      return Content(html, "text/html");
+    }
+
     // Issues a fresh single-use invitation for the party. Persisting it here
     // is what lets RegisterMember insist the id was really minted for the
     // party being joined; the id is consumed by the PartyMember row created
