@@ -9,6 +9,15 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const androidDir = path.join(root, "android");
 
+// Load .env so SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN reach Gradle.
+const envFile = path.join(root, ".env");
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match) process.env[match[1].trim()] = match[2].trim();
+  }
+}
+
 console.log("Building release AAB…");
 const gradlew = path.join(androidDir, "gradlew.bat");
 execSync(`"${gradlew}" bundleRelease`, {
