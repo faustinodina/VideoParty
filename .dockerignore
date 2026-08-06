@@ -4,5 +4,4 @@ docs/
 **/obj/
 **/bin/
 *.slnx.user
-.git/objects/
-.git/logs/
+.git/
