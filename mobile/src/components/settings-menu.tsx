@@ -21,6 +21,7 @@ interface BuildVersion {
 }
 
 const clientVersion = Constants.expoConfig?.version ?? '?';
+const clientCommit = (Constants.expoConfig?.extra?.gitCommit as string | undefined) ?? '?';
 
 export function SettingsMenu() {
   const theme = useTheme();
@@ -100,7 +101,7 @@ export function SettingsMenu() {
             <View style={styles.row}>
               <Text variant="bodySmall" style={styles.label}>App</Text>
               <Text variant="bodySmall" style={styles.cell}>v{clientVersion}</Text>
-              <Text variant="bodySmall" style={styles.cell}>—</Text>
+              <Text variant="bodySmall" style={styles.cell}>{clientCommit}</Text>
             </View>
             <View style={styles.row}>
               <Text variant="bodySmall" style={styles.label}>Server</Text>
