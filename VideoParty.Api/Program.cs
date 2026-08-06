@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -107,13 +106,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.MapHub<UserHub>("/hubs/user");
-
-app.MapGet("/version", () =>
-{
-    var version = typeof(Program).Assembly
-        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-        ?.InformationalVersion ?? "unknown";
-    return Results.Ok(new { version });
-}).AllowAnonymous();
 
 app.Run();
