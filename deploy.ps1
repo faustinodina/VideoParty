@@ -10,5 +10,7 @@ if (-not $version) {
     exit 1
 }
 
-Write-Host "Deploying version: $version"
-fly deploy --build-arg VERSION=$version
+$commit = git rev-parse HEAD
+
+Write-Host "Deploying version: $version ($($commit.Substring(0,7)))"
+fly deploy --build-arg VERSION=$version --build-arg COMMIT=$commit
