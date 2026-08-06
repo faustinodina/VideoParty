@@ -15,13 +15,18 @@ import {
 import { API_BASE_URL } from '@/constants/config';
 import { resetIdentity } from '@/services/userIdentity';
 
+interface BuildVersion {
+  version: string;
+  commit: string;
+}
+
 const clientVersion = Constants.expoConfig?.version ?? '?';
 
 export function SettingsMenu() {
   const theme = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
-  const [serverVersion, setServerVersion] = useState<string | null>(null);
+  const [serverVersion, setServerVersion] = useState<BuildVersion | null>(null);
   const [serverError, setServerError] = useState(false);
 
   const openAbout = async () => {
@@ -31,8 +36,7 @@ export function SettingsMenu() {
     setAboutVisible(true);
     try {
       const res = await fetch(`${API_BASE_URL}/VP/version`);
-      const data: { version: string } = await res.json();
-      setServerVersion(data.version);
+      setServerVersion(await res.json());
     } catch {
       setServerError(true);
     }
@@ -56,6 +60,11 @@ export function SettingsMenu() {
       ]
     );
   };
+
+  const serverVersionText = serverError
+    ? 'unavailable'
+    : (serverVersion?.version ?? 'loading…');
+  const serverCommitText = serverError ? '' : (serverVersion?.commit ?? '');
 
   return (
     <>
@@ -89,14 +98,14 @@ export function SettingsMenu() {
           <Dialog.Title>About VideoParty</Dialog.Title>
           <Dialog.Content>
             <View style={styles.row}>
-              <Text variant="bodyMedium" style={styles.label}>App</Text>
-              <Text variant="bodyMedium">v{clientVersion}</Text>
+              <Text variant="bodySmall" style={styles.label}>App</Text>
+              <Text variant="bodySmall" style={styles.cell}>v{clientVersion}</Text>
+              <Text variant="bodySmall" style={styles.cell}>—</Text>
             </View>
             <View style={styles.row}>
-              <Text variant="bodyMedium" style={styles.label}>Server</Text>
-              <Text variant="bodyMedium">
-                {serverError ? 'unavailable' : (serverVersion ?? 'loading…')}
-              </Text>
+              <Text variant="bodySmall" style={styles.label}>Server</Text>
+              <Text variant="bodySmall" style={styles.cell}>{serverVersionText}</Text>
+              <Text variant="bodySmall" style={styles.cell}>{serverCommitText}</Text>
             </View>
           </Dialog.Content>
           <Dialog.Actions>
@@ -114,10 +123,13 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   label: {
-    opacity: 0.6,
+    width: 52,
+    opacity: 0.5,
+  },
+  cell: {
+    flex: 1,
   },
 });
