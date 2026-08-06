@@ -73,12 +73,10 @@ function ShareIntentHandler() {
   return null;
 }
 
-// Material 3 palettes generated from the brand color, per Paper's theming
-// guide. MD3 tone-maps the source: colors.primary is an amber-derived tone
-// (dark gold in light mode, light amber in dark), not the literal hex.
-// Backgrounds stay pure white/black so Paper screens sit next to the
-// remaining custom-themed components without a visible seam.
-const material3 = createMaterial3Theme("#ffa000");
+// Material 3 palettes. The seed generates the full token set; explicit
+// overrides below pin the roles from the brand palette so secondary/tertiary
+// land on the intended purple/pink rather than whatever the generator picked.
+const material3 = createMaterial3Theme("#F5B31F");
 const paperThemes = {
   light: {
     ...MD3LightTheme,
@@ -86,7 +84,25 @@ const paperThemes = {
   },
   dark: {
     ...MD3DarkTheme,
-    colors: { ...material3.dark, background: "#000000" },
+    colors: {
+      ...material3.dark,
+      primary: "#F5B31F",
+      onPrimary: "#1E1E1E",
+      secondary: "#A855F7",
+      onSecondary: "#FFFFFF",
+      secondaryContainer: "#4A1D96",
+      onSecondaryContainer: "#E9D5FF",
+      tertiary: "#FF5FA2",
+      onTertiary: "#FFFFFF",
+      tertiaryContainer: "#831843",
+      onTertiaryContainer: "#FFD6E7",
+      error: "#EF4444",
+      onError: "#FFFFFF",
+      background: "#121212",
+      surface: "#1F1F1F",
+      surfaceVariant: "#2C2C2C",
+      outline: "#6B7280",
+    },
   },
 };
 

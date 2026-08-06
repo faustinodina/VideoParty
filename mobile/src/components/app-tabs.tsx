@@ -11,7 +11,14 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={theme.colors.background}
       indicatorColor={theme.colors.secondaryContainer}
-      labelStyle={{ selected: { color: theme.colors.onSurface } }}>
+      iconColor={{
+        default: theme.colors.onSurfaceVariant,
+        selected: theme.colors.onSecondaryContainer,
+      }}
+      labelStyle={{
+        default: { color: theme.colors.onSurfaceVariant },
+        selected: { color: theme.colors.onSecondaryContainer },
+      }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Parties</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

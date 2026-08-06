@@ -1,11 +1,11 @@
-import { StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SettingsMenu } from './settings-menu';
-import { UserBadge } from './user-badge';
+import { SettingsMenu } from "./settings-menu";
+import { UserBadge } from "./user-badge";
 
-import { Spacing } from '@/constants/theme';
+import { Spacing } from "@/constants/theme";
 
 /**
  * Top bar with the app brand and the signed-in user's name. NativeTabs has
@@ -19,6 +19,8 @@ import { Spacing } from '@/constants/theme';
 export default function AppHeader() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+
+  //console.log("theme primary:", theme.colors.primary); // Log the theme object to inspect its structure
 
   return (
     <View
@@ -44,14 +46,14 @@ export default function AppHeader() {
 
 const styles = StyleSheet.create({
   bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.two,
   },
   brand: {
     flex: 1,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });
