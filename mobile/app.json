@@ -26,6 +26,7 @@
     },
     "plugins": [
       "expo-router",
+      "@sentry/react-native/expo",
       "./plugins/withDevBuildConfig",
       "./plugins/withReleaseKeystore",
       [

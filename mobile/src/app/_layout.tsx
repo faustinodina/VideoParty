@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import {
   DarkTheme,
   DefaultTheme,
@@ -41,6 +42,12 @@ import {
   videoVoteChanged,
   videoShared,
 } from "@/store/partySlice";
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  debug: __DEV__,
+});
 
 // Receives Android share-sheet intents (e.g. Share → VideoParty from
 // YouTube): stores the link and lands on the Videos tab. A share that Add
@@ -106,7 +113,7 @@ const paperThemes = {
   },
 };
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
 
   // null while the stored credentials are being read; false shows the
@@ -254,3 +261,5 @@ export default function RootLayout() {
     </ShareIntentProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);
