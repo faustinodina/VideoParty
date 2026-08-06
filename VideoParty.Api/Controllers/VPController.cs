@@ -159,10 +159,11 @@ namespace VideoParty.Api.Controllers
       var informational = Assembly.GetExecutingAssembly()
           .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
           ?.InformationalVersion ?? "unknown";
-      var commit = informational.Contains('+')
-          ? informational[(informational.IndexOf('+') + 1)..]
-          : informational;
-      return new BuildVersion(informational, commit);
+      var plusIdx = informational.IndexOf('+');
+      var version = plusIdx >= 0 ? informational[..plusIdx] : informational;
+      var fullCommit = plusIdx >= 0 ? informational[(plusIdx + 1)..] : null;
+      var commit = fullCommit is { Length: > 7 } ? fullCommit[..7] : fullCommit ?? "unknown";
+      return new BuildVersion(version, commit);
     }
 
     // Email clients only auto-link https:// URLs, so the share message points
