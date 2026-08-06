@@ -2,7 +2,7 @@
   "expo": {
     "name": "VideoParty",
     "slug": "videoparty",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "videoparty",
@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.faustinodina.videoparty"
+      "package": "com.faustinodina.videoparty",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
