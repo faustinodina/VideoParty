@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import {
   Button,
@@ -13,6 +13,7 @@ import {
 } from 'react-native-paper';
 
 import { API_BASE_URL } from '@/constants/config';
+import { getSentryEnabled, setSentryEnabled } from '@/services/sentryService';
 import { resetIdentity } from '@/services/userIdentity';
 
 interface BuildVersion {
@@ -29,6 +30,11 @@ export function SettingsMenu() {
   const [aboutVisible, setAboutVisible] = useState(false);
   const [serverVersion, setServerVersion] = useState<BuildVersion | null>(null);
   const [serverError, setServerError] = useState(false);
+  const [sentryEnabled, setSentryEnabledState] = useState(false);
+
+  useEffect(() => {
+    getSentryEnabled().then(setSentryEnabledState);
+  }, []);
 
   const openAbout = async () => {
     setMenuVisible(false);
@@ -41,6 +47,12 @@ export function SettingsMenu() {
     } catch {
       setServerError(true);
     }
+  };
+
+  const toggleSentry = async () => {
+    const next = !sentryEnabled;
+    setSentryEnabledState(next);
+    await setSentryEnabled(next);
   };
 
   // Resetting is destructive — the old identity's party memberships are
@@ -86,6 +98,12 @@ export function SettingsMenu() {
           leadingIcon="account-off"
           title="Reset identity"
           onPress={confirmReset}
+        />
+        <Menu.Item
+          leadingIcon="bug-outline"
+          title="Crash reporting"
+          trailingIcon={sentryEnabled ? "toggle-switch" : "toggle-switch-off-outline"}
+          onPress={() => void toggleSentry()}
         />
         <Divider />
         <Menu.Item

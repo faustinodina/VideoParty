@@ -20,6 +20,7 @@ import { Provider } from "react-redux";
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import RegisterScreen from "@/components/register-screen";
 import signalR from "@/services/signalRService";
+import { initSentryFromPreference } from "@/services/sentryService";
 import {
   getUserId,
   isRegistered,
@@ -43,11 +44,9 @@ import {
   videoShared,
 } from "@/store/partySlice";
 
-Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  tracesSampleRate: 1.0,
-  debug: __DEV__,
-});
+// Placeholder init with no DSN — actual opt-in preference is applied in
+// RootLayout once AsyncStorage is readable.
+Sentry.init({ debug: __DEV__ });
 
 // Receives Android share-sheet intents (e.g. Share → VideoParty from
 // YouTube): stores the link and lands on the Videos tab. A share that Add
@@ -119,6 +118,10 @@ function RootLayout() {
   // null while the stored credentials are being read; false shows the
   // first-launch registration screen instead of the app.
   const [registered, setRegistered] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void initSentryFromPreference();
+  }, []);
 
   useEffect(() => {
     isRegistered().then(setRegistered);
