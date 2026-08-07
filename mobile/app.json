@@ -2,7 +2,7 @@
   "expo": {
     "name": "VideoParty",
     "slug": "videoparty",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "videoparty",
@@ -19,7 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.faustinodina.videoparty",
-      "versionCode": 4
+      "versionCode": 5
     },
     "web": {
       "output": "static",
