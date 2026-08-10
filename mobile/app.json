@@ -2,7 +2,7 @@
   "expo": {
     "name": "VideoParty",
     "slug": "videoparty",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "videoparty",
@@ -19,7 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.faustinodina.videoparty",
-      "versionCode": 5
+      "versionCode": 6
     },
     "web": {
       "output": "static",
@@ -55,7 +55,8 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withPhoneOnlyScreens"
     ],
     "experiments": {
       "typedRoutes": true,
